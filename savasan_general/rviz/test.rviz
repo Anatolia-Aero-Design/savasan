@@ -1,0 +1,19 @@
+Visualization Manager:
+  Displays:
+    - Class: rviz/AerialMapDisplay
+      Name: AerialMap
+      Service: http://tile.openstreetmap.org/{z}/{x}/{y}.png
+      Zoom: 18
+      Alpha: 0.7
+    - Class: rviz/Grid
+      Name: Grid
+      Plane: XY
+      Cell Size: 1.0
+      Color: 160; 160; 160
+    - Class: rviz/RobotModel
+      Name: RobotModel
+      Robot Description: robot_description
+    - Class: rviz/TF
+      Name: TF
+      Show Axes: true
+  Fixed Frame: map
