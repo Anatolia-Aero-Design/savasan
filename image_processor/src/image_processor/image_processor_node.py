@@ -1,46 +1,57 @@
 #!/usr/bin/env python
 
 import rospy
-import message_filters
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from image_processor.msg import Yolo_xywh
 import cv2
-import numpy as np
-from image_processor.msg import Yolo_xywh  # Import the custom message
+import message_filters
 
-class ImageProcessor:
+class BBoxDrawerNode:
     def __init__(self):
         self.bridge = CvBridge()
-        self.image_pub = rospy.Publisher('/processed_image', Image, queue_size=50)
 
-        image_sub = message_filters.Subscriber('/camera/image_raw', Image)
-        xywh_sub = message_filters.Subscriber('/yolov8/xywh', Yolo_xywh)
+        # Subscribers using message_filters for synchronization
+        image_sub = message_filters.Subscriber("/camera/image_raw", Image)
+        bbox_sub = message_filters.Subscriber("/yolov8/xywh", Yolo_xywh)
 
-        ats = message_filters.TimeSynchronizer([image_sub, xywh_sub], queue_size=50)
-        ats.registerCallback(self.callback)
+        self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub], 60, 0.001)
+        self.ts.registerCallback(self.callback)
 
-    def callback(self, image_msg, xywh_msg=None):
+        # Publisher for processed images
+        self.image_pub = rospy.Publisher("/camera/image_processed", Image, queue_size=60)
+        
+
+
+    def callback(self, image_msg, bbox_msg):
+
         try:
-            cv_image = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
+            # Convert ROS Image message to OpenCV image
+            frame = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
+
         except CvBridgeError as e:
-            rospy.logerr("CvBridge Error: {0}".format(e))
+            rospy.logerr(f"CvBridge Error: {e}")
             return
 
-        if xywh_msg is not None:
-            x, y, w, h, trackid = xywh_msg.x, xywh_msg.y, xywh_msg.w, xywh_msg.h, xywh_msg.trackid
-            cv2.rectangle(cv_image, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)), (0, 255, 0), 2)
-            cv2.putText(cv_image, f'ID: {int(trackid)}', (int(x - w / 2), int(y - h / 2) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        # Draw bounding box
+        x, y, w, h = bbox_msg.x, bbox_msg.y, bbox_msg.w, bbox_msg.h
+        if x != 0 or y != 0 or w != 0 or h != 0:
+            cv2.rectangle(frame, (x, y), (w, h), (0, 255, 0), 2)
+
 
         try:
-            processed_image_msg = self.bridge.cv2_to_imgmsg(cv_image, "bgr8")
+            # Convert OpenCV image back to ROS Image message
+            processed_image_msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
+            processed_image_msg.header = image_msg.header
             self.image_pub.publish(processed_image_msg)
-        except CvBridgeError as e:
-            rospy.logerr("CvBridge Error: {0}".format(e))
 
-def main():
-    rospy.init_node('image_and_xywh_processor', anonymous=True)
-    ImageProcessor()
-    rospy.spin()
+        except CvBridgeError as e:
+            rospy.logerr(f"CvBridge Error: {e}")
 
 if __name__ == '__main__':
-    main()
+    rospy.init_node('bbox_drawer_node', anonymous=True)
+    bbox_drawer_node = BBoxDrawerNode()
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        rospy.loginfo("Shutting down BBox Drawer node")
