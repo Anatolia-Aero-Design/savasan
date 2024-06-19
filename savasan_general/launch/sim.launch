@@ -30,6 +30,7 @@
     <node name="yolov8_node" pkg="yolov8" type="yolov8_node.py" output="screen"/>
     <node name="image_processor_node" pkg="image_processor" type="image_processor_node.py" output="screen"/>
 
+
     <!-- Home GPS Publisher -->
     <node name="home_gps_publisher" pkg="savasan_general" type="home_gps_publisher.py" output="screen"/>
 
