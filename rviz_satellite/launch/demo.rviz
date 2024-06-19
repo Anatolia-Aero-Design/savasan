@@ -9,8 +9,9 @@ Panels:
         - /AerialMapDisplay1
         - /TF1
         - /TF1/Tree1
+        - /Image1
       Splitter Ratio: 0.5
-    Tree Height: 292
+    Tree Height: 344
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -45,7 +46,7 @@ Visualization Manager:
       Map transform type: NavSatFix Messages and Map Frame
       Name: AerialMapDisplay
       Object URI: https://tile.openstreetmap.org/{z}/{x}/{y}.png
-      Topic: /mavros/global_position/global
+      Topic: /home_position/navsatfix
       UTM Frame: utm
       UTM Zone: -1
       Value: true
@@ -85,9 +86,9 @@ Visualization Manager:
               {}
           map_ned:
             {}
-        odom:
-          odom_ned:
-            {}
+          odom:
+            odom_ned:
+              {}
       Update Interval: 0
       Value: true
     - Class: rviz/Image
@@ -101,6 +102,14 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /visualization_marker_array
+      Name: MarkerArray
+      Namespaces:
+        iha_visualization: true
+      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -130,7 +139,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 653.5020751953125
+      Distance: 810.3425903320312
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -138,17 +147,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 68.25920867919922
-        Y: 103.85635375976562
-        Z: -15.686254501342773
+        X: 76.64952087402344
+        Y: 113.34239196777344
+        Z: -4.321051597595215
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.40979719161987305
+      Pitch: 0.5197972059249878
       Target Frame: map
-      Yaw: 5.158555030822754
+      Yaw: 5.238555431365967
     Saved: ~
 Window Geometry:
   Displays:
@@ -158,7 +167,7 @@ Window Geometry:
   Hide Right Dock: false
   Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000001000000000000035c00000399fc0200000006fb000000100044006900730070006c006100790073010000003b000001ad000000c700fffffffb0000001200530065006c0065006300740069006f006e000000026a0000010f0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000002c0000000cf0000005c00fffffffb0000000a0056006900650077007300000002cf000000d1000000a000fffffffb0000000800540069006d006500000001f80000005c0000003700fffffffb0000000a0049006d00610067006501000001ee000001e60000001600ffffff000004120000039900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000001000000000000035c00000399fc0200000007fb000000100044006900730070006c006100790073010000003b000001e1000000c700fffffffb0000001200530065006c0065006300740069006f006e000000026a0000010f0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000002c0000000cf0000005c00fffffffb0000000a0056006900650077007300000002cf000000d1000000a000fffffffb0000000800540069006d006500000001f80000005c0000003700fffffffb0000000a0049006d0061006700650100000222000001b20000001600fffffffb0000000a0049006d00610067006501000001cb000002090000000000000000000004120000039900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -168,5 +177,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1908
-  X: 1920
-  Y: 0
+  X: -32
+  Y: -32

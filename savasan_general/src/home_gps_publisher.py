@@ -1,56 +1,30 @@
 #!/usr/bin/env python
 
 import rospy
+from mavros_msgs.msg import HomePosition
 from sensor_msgs.msg import NavSatFix
-from mavros_msgs.srv import CommandHome, CommandHomeRequest
 
-def set_home_position(gps_data):
-    rospy.wait_for_service('/mavros/cmd/set_home')
-    try:
-        set_home_srv = rospy.ServiceProxy('/mavros/cmd/set_home', CommandHome)
-        home_request = CommandHomeRequest()
-        home_request.current_gps = True
-        home_request.latitude = gps_data.latitude
-        home_request.longitude = gps_data.longitude
-        home_request.altitude = gps_data.altitude
+def home_position_callback(msg):
+    navsatfix_msg = NavSatFix()
 
-        response = set_home_srv(home_request)
-        if response.success:
-            rospy.loginfo("Home position set successfully.")
-        else:
-            rospy.logerr("Failed to set home position.")
-    except rospy.ServiceException as e:
-        rospy.logerr("Service call failed: %s", e)
+    navsatfix_msg.header.stamp = rospy.Time.now()
+    navsatfix_msg.header.frame_id = "map"
 
-def get_current_gps():
-    try:
-        gps_data = rospy.wait_for_message('/mavros/global_position/global', NavSatFix, timeout=10)
-        return gps_data
-    except rospy.ROSException as e:
-        rospy.logerr("Failed to get current GPS position: %s", str(e))
-        return None
+    navsatfix_msg.latitude = msg.geo.latitude
+    navsatfix_msg.longitude = msg.geo.longitude
+    navsatfix_msg.altitude = msg.geo.altitude
 
-def publish_home_gps():
-    rospy.init_node('home_gps_publisher', anonymous=True)
-    home_gps_pub = rospy.Publisher('home_gps', NavSatFix, queue_size=10)
-
-    gps_data = get_current_gps()
-    if gps_data is None:
-        rospy.logerr("Unable to set home GPS position. Exiting.")
-        return
-
-    set_home_position(gps_data)
-
-    rospy.loginfo("Home GPS position acquired: Lat: %f, Lon: %f, Alt: %f",
-                  gps_data.latitude, gps_data.longitude, gps_data.altitude)
-
-    rate = rospy.Rate(1)  # Publish at 1 Hz
-    while not rospy.is_shutdown():
-        home_gps_pub.publish(gps_data)
-        rate.sleep()
+    # Publish the NavSatFix message
+    navsatfix_pub.publish(navsatfix_msg)
 
 if __name__ == '__main__':
-    try:
-        publish_home_gps()
-    except rospy.ROSInterruptException:
-        pass
+    rospy.init_node('home_position_publisher', anonymous=True)
+
+    # Create a publisher for the NavSatFix message
+    navsatfix_pub = rospy.Publisher('/home_position/navsatfix', NavSatFix, queue_size=10)
+
+    # Create a subscriber for the HomePosition message
+    rospy.Subscriber('/mavros/home_position/home', HomePosition, home_position_callback)
+
+    # Keep the node running
+    rospy.spin()
