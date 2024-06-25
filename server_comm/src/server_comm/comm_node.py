@@ -14,7 +14,7 @@ from server_comm.msg import KonumBilgileri, KonumBilgisi
 from utils import quaternion_to_euler, calculate_speed, mode_guided
 
 # Configure logging
-logging.basicConfig(filename='/home/auki/catkin_ws/logs/serverlog.log',level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log',level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
     try:
@@ -39,7 +39,7 @@ def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
         }
 
         # Server URL
-        server_url = 'http://172.31.32.149:5000/update_data'
+        server_url = 'http://10.42.0.1:5000/update_data'
 
         # Send data to the server
         response = requests.post(server_url, json=data_dict)
@@ -97,8 +97,8 @@ def synchronize_topics():
         # ApproximateTimeSynchronizer to synchronize messages based on timestamps
         sync = ApproximateTimeSynchronizer(
             [imu_sub, battery_sub, rel_altitude_sub, position_sub, speed_sub],
-            queue_size=10,
-            slop=0.01,  # Adjust this parameter based on your message timestamp tolerances
+            queue_size=20,
+            slop=0.005,  # Adjust this parameter based on your message timestamp tolerances
             allow_headerless=True
         )
         sync.registerCallback(callback)

@@ -36,8 +36,7 @@ class BBoxDrawerNode:
         # Draw bounding box
         x, y, w, h = bbox_msg.x, bbox_msg.y, bbox_msg.w, bbox_msg.h
         if x != 0 or y != 0 or w != 0 or h != 0:
-            cv2.rectangle(frame, (x, y), (w, h), (0, 255, 0), 2)
-
+            cv2.rectangle(frame, (x, y), (w, h), (0, 0, 255), 2)
 
         try:
             # Convert OpenCV image back to ROS Image message

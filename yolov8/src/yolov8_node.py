@@ -17,18 +17,13 @@ class YOLOv8TrackingNode:
 		self.bbox_pub = rospy.Publisher("/yolov8/xywh", Yolo_xywh, queue_size=60)
 
 
-		self.model = YOLO("/home/auki/catkin_ws/src/savasan/yolov8/model/best_s.pt")
+		self.model = YOLO("/home/valvarn/catkin_ws/src/savasan/yolov8/model/best_s.pt")
 
 		# Services to start and stop tracking
 		self.start_service = rospy.Service('start_yolov8_tracking', Empty, self.start_tracking)
 		self.stop_service = rospy.Service('stop_yolov8_tracking', Empty, self.stop_tracking)
 		self.xyxy = Yolo_xywh() 
-		# Initialize the VideoWriter
-		self.video_writer = None
-		self.frame_width = 1920  # Set the frame width
-		self.frame_height = 1080  # Set the frame height
-		self.fps = 30  # Frames per second
-		self.video_filename = '/home/auki/catkin_ws/output.avi'  # Set the output video filename
+
 
 
 	def start_tracking(self, req):
@@ -59,7 +54,7 @@ class YOLOv8TrackingNode:
 			
 		# Run YOLOv8 tracking on the frame, persisting tracks between frames
 		t1 = time.time()
-		results = self.model.track(frame,persist=True,stream_buffer=True)
+		results = self.model.track(frame,persist=True,stream_buffer=True,verbose=True)
 		t2 = time.time()
 		print(t2-t1)
 		t3 = time.time()

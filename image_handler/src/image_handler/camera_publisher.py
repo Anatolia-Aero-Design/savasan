@@ -11,7 +11,7 @@ def camera_publisher():
 
     bridge = CvBridge()
     while 1:
-        cap = cv2.VideoCapture('/home/auki/catkin_ws/src/savasan/image_handler/files/chase.mp4')
+        cap = cv2.VideoCapture('/home/valvarn/catkin_ws/src/savasan/image_handler/video/FoggyFPVHeaven.mp4')
 
         if not cap.isOpened():
             rospy.logerr("Cannot open camera")
