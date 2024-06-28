@@ -62,7 +62,7 @@ class BBoxDrawerNode:
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")
               
-    # Calculate lock on proportion to the target area 
+    # Calculate bounding box proportion to the target area 
     def calculate_lock_on_proportion(self, target_coordinates, bbox_coordinates):
         # Coordinates for the target area 
         x_t, y_t, w_t, h_t = target_coordinates
@@ -90,7 +90,7 @@ class BBoxDrawerNode:
     
     def lock_on_status(self, proportions, image_msg):
         lock_on_status = None
-        if lock_on_status is not True and proportions[0] >= 0.93 and proportions[1] >= 0.93: # 0.05 is tolerance threshold for proportions
+        if lock_on_status is not True and proportions[0] >= 0.93 and proportions[1] >= 0.93: # 0.05 is error threshold for proportions
             elapsed_time = self.timer(image_msg) # start timer when contact is made
             if elapsed_time >= 4.00:
                 lock_on_status = True
@@ -102,8 +102,7 @@ class BBoxDrawerNode:
             text_y = int((image_msg.shape[0] + text_size[1]) / 2)
             cv2.putText(image_msg, elapsed_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             self.start_time = None
-            lock_on_status = False
-            print("Failed")  
+            lock_on_status = False 
         return lock_on_status
     
     def timer(self, image_msg):
