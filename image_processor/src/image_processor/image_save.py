@@ -8,7 +8,6 @@ import cv2
 import message_filters
 import time 
 
-# TODO şartnameye göre güncellenecek
 class VideoSaveNode:
     def __init__(self):
         self.bridge = CvBridge()
@@ -49,8 +48,8 @@ class VideoSaveNode:
 
 if __name__ == '__main__':
     rospy.init_node('VideoSaveNode', anonymous=True)
-    bbox_drawer_node = VideoSaveNode()
-    rospy.on_shutdown(bbox_drawer_node.shutdown)
+    save_node = VideoSaveNode()
+    rospy.on_shutdown(save_node.shutdown)
     try:
         rospy.spin()
     except KeyboardInterrupt:

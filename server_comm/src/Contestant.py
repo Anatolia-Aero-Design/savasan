@@ -30,3 +30,5 @@ class Contestant():
             "IHA_zamanfarki" : 0 ,
         }
         return response
+    
+    

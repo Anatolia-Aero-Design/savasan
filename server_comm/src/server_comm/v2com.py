@@ -69,7 +69,7 @@ if __name__ == '__main__':
     try:
         print('hello')
         # Connection string to the vehicle
-        connection_string = '127.0.0.1:14570'  # Change this to your connection string
+        connection_string = '10.42.0.1:14570'  # Change this to your connection string
 
         # Connect to vehicle
         vehicle = connect_to_vehicle(connection_string)
