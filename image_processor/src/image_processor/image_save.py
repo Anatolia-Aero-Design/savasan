@@ -6,6 +6,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from image_processor.msg import Yolo_xywh
 import cv2
 import message_filters
+import time 
 
 # TODO şartnameye göre güncellenecek
 class VideoSaveNode:
@@ -14,10 +15,12 @@ class VideoSaveNode:
 
         # Subscribers using message_filters for synchronization
         image_sub = rospy.Subscriber("/camera/image_processed", Image, self.callback)
-
+        competition_no = 1 # Will be set accordingly during each round of competition
+        current_time = time.localtime()
+        file_name = f"{competition_no}_Anatolia_Aero_Design_{current_time.tm_mday}_0{current_time.tm_mon}_{current_time.tm_year}.avi"
         # Initialize video writer
         self.video_writer = None
-        self.video_filename = "/home/valvarn/catkin_ws/src/savasan/output_video.avi"
+        self.video_filename = f"/home/valvarn/catkin_ws/src/savasan/{file_name}"
         self.fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         self.frame_width =  1280  # Update this with the actual width of your image
         self.frame_height = 720  # Update this with the actual height of your image
