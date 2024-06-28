@@ -25,7 +25,6 @@ class YOLOv8TrackingNode:
 		self.xyxy = Yolo_xywh() 
 
 
-
 	def start_tracking(self, req):
 		if self.image_sub is None:
 			self.image_sub = rospy.Subscriber("/camera/image_raw", Image, self.image_callback)
@@ -36,10 +35,6 @@ class YOLOv8TrackingNode:
 		if self.image_sub is not None:
 			self.image_sub.unregister()
 			self.image_sub = None
-			
-			if self.video_writer is not None:
-				self.video_writer.release()
-				
 			rospy.loginfo("YOLOv8 tracking stopped.")
 		return EmptyResponse()
 
@@ -76,13 +71,6 @@ class YOLOv8TrackingNode:
 		t4 = time.time()
 		print(t4-t3)
 		self.bbox_pub.publish(self.xyxy)
-
-
-	def __del__(self):
-		# Release the VideoWriter when the node is destroyed
-		print('destroyed')
-		if self.video_writer is not None:
-			self.video_writer.release()
 
 
 if __name__ == '__main__':

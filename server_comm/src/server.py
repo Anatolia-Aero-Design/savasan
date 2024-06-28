@@ -16,4 +16,4 @@ def update_data():
 
 if __name__ == '__main__':
     competition = Competition()
-    app.run(debug=True, host='172.31.32.149', port=5000)
+    app.run(debug=True, host='127.0.0.1', port=5000)
