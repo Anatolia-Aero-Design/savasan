@@ -41,4 +41,5 @@ class Competition():
         for contestant in self.contestants:
             response_json["konumBilgileri"].append(contestant.get_info())
         
+        
         return response_json
