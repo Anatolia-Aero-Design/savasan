@@ -118,7 +118,7 @@ class BBoxDrawerNode:
         cv2.putText(image_msg, elapsed_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
         return elapsed_time
 
-# TODO complete this function
+# TODO complete this function 
     def fetch_server_time(self, image_msg):
         current_time_msg = None
         
