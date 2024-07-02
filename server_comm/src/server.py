@@ -14,7 +14,8 @@ def update_data():
 
 @app.route('/get_server_time', methods=['GET'])
 def get_server_time():
-    server_time = competition.get_server_time()
+    json_data = competition.response_json()
+    server_time = json_data["sunucusaati"]
     return jsonify({"sunucusaati": server_time}), 200
 
 if __name__ == '__main__':
