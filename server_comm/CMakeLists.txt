@@ -17,6 +17,7 @@ add_message_files(
   FILES
   KonumBilgisi.msg
   KonumBilgileri.msg
+  ServerTime.msg
 )
 
 # Add service files if any

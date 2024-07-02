@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from sensor_msgs.msg import Imu, BatteryState, NavSatFix # type: ignore
+from sensor_msgs.msg import Imu, BatteryState, NavSatFix
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64
 from geometry_msgs.msg import TwistStamped
@@ -10,11 +10,11 @@ from message_filters import Subscriber, ApproximateTimeSynchronizer
 import requests
 import json
 import logging
-from server_comm.msg import KonumBilgileri, KonumBilgisi
+from server_comm.msg import KonumBilgileri, KonumBilgisi, ServerTime
 from utils import quaternion_to_euler, calculate_speed, mode_guided
 
 # Configure logging
-logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log',level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
     try:
@@ -43,10 +43,14 @@ def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
 
         # Send data to the server
         response = requests.post(server_url, json=data_dict)
-
         
+        # Fetch server time
+        server_time = fetch_server_time(server_url)
+        if server_time:
+            logging.info(f"Server time: {server_time}")
+            publish_server_time(server_time)
+
         # Check server response
-        logging.info(f"Data sent successfully: {response.json()}")
         if response.status_code == 200:
             logging.info(f"Data sent successfully: {response.json()}")
             parse_and_publish_konumBilgileri(response.json())
@@ -55,6 +59,30 @@ def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
 
     except Exception as e:
         logging.error(f"An error occurred in callback: {str(e)}")
+
+def fetch_server_time(server_url):
+    try:
+        response = requests.get(server_url)
+        response.raise_for_status()  # Raise an HTTPError on bad responses
+        data_dict = response.json()
+        sunucusaati = data_dict.get('sunucusaati', {})
+        return sunucusaati
+    except requests.exceptions.RequestException as e:
+        rospy.logerr(f"Failed to fetch data from server: {e}")
+        return None 
+
+def publish_server_time(server_time):
+    try:
+        server_time_msg = ServerTime()
+        server_time_msg.gun = server_time.get('gun', 0)
+        server_time_msg.saat = server_time.get('saat', 0)
+        server_time_msg.dakika = server_time.get('dakika', 0)
+        server_time_msg.saniye = server_time.get('saniye', 0)
+        server_time_msg.milisaniye = server_time.get('milisaniye', 0)
+        server_time_pub.publish(server_time_msg)
+        logging.info("Published server time message.")
+    except Exception as e:
+        logging.error(f"An error occurred while publishing server time: {str(e)}")
 
 def parse_and_publish_konumBilgileri(response_json):
     try:
@@ -103,9 +131,10 @@ def synchronize_topics():
         )
         sync.registerCallback(callback)
         
-        # Initialize the konum publisher
-        global konum_pub
+        # Initialize the publishers
+        global konum_pub, server_time_pub
         konum_pub = rospy.Publisher('konum_bilgileri', KonumBilgileri, queue_size=10)
+        server_time_pub = rospy.Publisher('server_time', ServerTime, queue_size=10)
 
         logging.info("Synchronize topics node started.")
         rospy.spin()

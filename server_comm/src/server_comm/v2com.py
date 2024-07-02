@@ -51,7 +51,7 @@ def get_vehicle_data(vehicle):
 def send_data_to_server(data_dict):
     try:
         # Server URL
-        server_url = 'http://172.31.32.149:5000/update_data'
+        server_url = 'http://10.42.0.1:5000/update_data'
 
         # Send data to the server
         response = requests.post(server_url, json=data_dict)
