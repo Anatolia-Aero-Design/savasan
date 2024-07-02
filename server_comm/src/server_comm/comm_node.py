@@ -8,10 +8,9 @@ from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 import requests
-import json
 import logging
 from server_comm.msg import KonumBilgileri, KonumBilgisi, ServerTime
-from utils import quaternion_to_euler, calculate_speed, mode_guided
+from utils import quaternion_to_euler, calculate_speed
 
 # Configure logging
 logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -23,7 +22,7 @@ def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
                                                imu_msg.orientation.y,
                                                imu_msg.orientation.z,
                                                imu_msg.orientation.w)
-
+        
         # Prepare data dictionary
         data_dict = {
             "takim_numarasi": 31,
@@ -38,19 +37,23 @@ def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
             "IHA_otonom": 1
         }
 
-        # Server URL
-        server_url_update = 'http://127.0.0.1:5000/update_data'
-        server_url_get = 'http://127.0.0.1:5000/get_server_time'
-
+        logging.info("Prepared data dictionary for server update.")
+        
+        server_url_update = rospy.get_param('/update_data')
+        get_server_time_url = rospy.get_param('/get_server_time')
+        
         # Send data to the server
         response = requests.post(server_url_update, json=data_dict)
-        
+        logging.info(f"Sent data to server: {data_dict}")
+
         # Fetch server time
-        server_time = fetch_server_time(server_url_get)
+        server_time = fetch_server_time(get_server_time_url)
         if server_time:
             logging.info(f"Server time: {server_time}")
             publish_server_time(server_time)
-
+        else:
+            logging.warning("Failed to fetch server time.")
+            
         # Check server response
         if response.status_code == 200:
             logging.info(f"Data sent successfully: {response.json()}")
@@ -69,7 +72,7 @@ def fetch_server_time(server_url):
         sunucusaati = data_dict.get('sunucusaati', {})
         return sunucusaati
     except requests.exceptions.RequestException as e:
-        rospy.logerr(f"Failed to fetch data from server: {e}")
+        logging.error(f"Failed to fetch data from server: {e}")
         return None 
 
 def publish_server_time(server_time):
@@ -88,9 +91,8 @@ def publish_server_time(server_time):
 def parse_and_publish_konumBilgileri(response_json):
     try:
         konumBilgileri_msg = KonumBilgileri()
-
-        # Assuming the response contains konumBilgileri field
         konumBilgileri_data = response_json.get("konumBilgileri", [])
+        
         for item in konumBilgileri_data:
             konum_bilgisi = KonumBilgisi()
             konum_bilgisi.IHA_boylam = item["IHA_boylam"]
@@ -114,8 +116,7 @@ def parse_and_publish_konumBilgileri(response_json):
 def synchronize_topics():
     try:
         rospy.init_node('sync_node', anonymous=True)
-
-        # Define subscribers
+        
         imu_sub = Subscriber('/mavros/imu/data', Imu)
         battery_sub = Subscriber('/mavros/battery', BatteryState)
         rel_altitude_sub = Subscriber('/mavros/global_position/rel_alt', Float64)
@@ -123,25 +124,23 @@ def synchronize_topics():
         speed_sub = Subscriber('/mavros/local_position/velocity_local', TwistStamped)
         state_sub = Subscriber('/mavros/state', State)
 
-        # ApproximateTimeSynchronizer to synchronize messages based on timestamps
         sync = ApproximateTimeSynchronizer(
             [imu_sub, battery_sub, rel_altitude_sub, position_sub, speed_sub],
             queue_size=20,
-            slop=0.005,  # Adjust this parameter based on your message timestamp tolerances
+            slop=0.005,  # Adjusted slop for better tolerance
             allow_headerless=True
         )
         sync.registerCallback(callback)
         
-        # Initialize the publishers
         global konum_pub, server_time_pub
         konum_pub = rospy.Publisher('konum_bilgileri', KonumBilgileri, queue_size=10)
-        server_time_pub = rospy.Publisher('server_time', ServerTime, queue_size=10)
+        server_time_pub = rospy.Publisher('get_server_time', ServerTime, queue_size=10)
 
         logging.info("Synchronize topics node started.")
         rospy.spin()
 
     except Exception as e:
-        logging.exception(f"An error occurred while initializing the node: {str(e)}")
+        logging.error(f"An error occurred while initializing the node: {str(e)}")
 
 if __name__ == '__main__':
     try:
@@ -149,4 +148,4 @@ if __name__ == '__main__':
     except rospy.ROSInterruptException:
         logging.info("ROS node interrupted.")
     except Exception as e:
-        logging.exception(f"An error occurred in the main loop: {str(e)}")
+        logging.error(f"An error occurred in the main loop: {str(e)}")

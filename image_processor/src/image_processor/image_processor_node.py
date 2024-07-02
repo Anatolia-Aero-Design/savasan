@@ -18,7 +18,7 @@ class ImageProcessorNode:
         # Subscribers using message_filters for synchronization
         image_sub = message_filters.Subscriber("/camera/image_raw", Image)
         bbox_sub = message_filters.Subscriber("/yolov8/xywh", Yolo_xywh)  # Adjust topic and message type
-        server_time_sub = message_filters.Subscriber("/server_time", ServerTime)
+        server_time_sub = message_filters.Subscriber("/get_server_time", ServerTime)
 
         self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub, server_time_sub], 
                                                               queue_size=60, slop=0.001, allow_headerless=True) 

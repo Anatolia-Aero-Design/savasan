@@ -22,7 +22,8 @@
 
     <!-- server_comm Node Configuration -->
     <node name="comm_node" pkg="server_comm" type="comm_node.py" output="screen">
-        <param name="server_url" value="http://127.0.0.1:5000/update_data" /> <!-- Update it according to your server IP -->
+        <param name="update_data" value="http://127.0.0.1:5000/update_data" /> <!-- Update it according to your server IP -->
+        <param name="get_server_time" value="http://127.0.0.1:5010/get_server_time" /> 
     </node>
 
     <node name="camera_publisher" pkg="image_handler" type="camera_publisher.py" output="screen"/>
