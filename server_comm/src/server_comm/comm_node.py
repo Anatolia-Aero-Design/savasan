@@ -39,13 +39,14 @@ def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
         }
 
         # Server URL
-        server_url = 'http://10.42.0.1:5000/update_data'
+        server_url_update = 'http://127.0.0.1:5000/update_data'
+        server_url_get = 'http://127.0.0.1:5000/get_server_time'
 
         # Send data to the server
-        response = requests.post(server_url, json=data_dict)
+        response = requests.post(server_url_update, json=data_dict)
         
         # Fetch server time
-        server_time = fetch_server_time(server_url)
+        server_time = fetch_server_time(server_url_get)
         if server_time:
             logging.info(f"Server time: {server_time}")
             publish_server_time(server_time)

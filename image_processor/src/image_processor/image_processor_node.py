@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from math import e
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
@@ -19,9 +20,10 @@ class ImageProcessorNode:
         bbox_sub = message_filters.Subscriber("/yolov8/xywh", Yolo_xywh)  # Adjust topic and message type
         server_time_sub = message_filters.Subscriber("/server_time", ServerTime)
 
-        self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub, server_time_sub], 60, 0.001)
+        self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub, server_time_sub], 
+                                                              queue_size=60, slop=0.001, allow_headerless=True) 
         self.ts.registerCallback(self.callback)
-
+        
         # Publisher for processed images
         self.image_pub = rospy.Publisher("/camera/image_processed", Image, queue_size=60)
     

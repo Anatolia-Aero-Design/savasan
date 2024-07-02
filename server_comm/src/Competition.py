@@ -32,7 +32,7 @@ class Competition():
             "saat": current_time.hour,
             "dakika": current_time.minute,
             "saniye": current_time.second,
-            "milisaniye": current_time.microsecond // 1000 
+            "milisaniye": current_time.microsecond // 1000
         },
             "konumBilgileri": [
                 
