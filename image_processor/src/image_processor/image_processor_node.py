@@ -1,19 +1,15 @@
 #!/usr/bin/env python
 
-from calendar import LocaleHTMLCalendar
-from tkinter import NO
-from tracemalloc import start
-from pygame import ver
-from sympy import N
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from image_processor.msg import Yolo_xywh  # Adjust this import based on your message definition
+from server_comm.msg import ServerTime
 import cv2
 import message_filters
 import time
 
-class BBoxDrawerNode:
+class ImageProcessorNode:
     def __init__(self):
         self.bridge = CvBridge()
         self.start_time = None
@@ -21,14 +17,16 @@ class BBoxDrawerNode:
         # Subscribers using message_filters for synchronization
         image_sub = message_filters.Subscriber("/camera/image_raw", Image)
         bbox_sub = message_filters.Subscriber("/yolov8/xywh", Yolo_xywh)  # Adjust topic and message type
+        server_time_sub = message_filters.Subscriber("/get_server_time", ServerTime)
 
-        self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub], 60, 0.001)
+        self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub, server_time_sub], 
+                                                              queue_size=60, slop=0.001, allow_headerless=True) 
         self.ts.registerCallback(self.callback)
-
+        
         # Publisher for processed images
         self.image_pub = rospy.Publisher("/camera/image_processed", Image, queue_size=60)
     
-    def callback(self, image_msg, bbox_msg):
+    def callback(self, image_msg, bbox_msg, server_time_msg):
         try:
             # Convert ROS Image message to OpenCV image
             frame = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
@@ -47,12 +45,20 @@ class BBoxDrawerNode:
         target_box_w = int(1280 * 0.75)
         target_box_h = int(720 * 0.9)
         cv2.rectangle(frame, (target_box_x, target_box_y), (target_box_w, target_box_h), (0, 255, 0), 2) # thickness max value must be 3
-        
+                
         bbox_coordinates = bbox_x, bbox_y, bbox_w, bbox_h
         target_coordinates = target_box_x, target_box_y, target_box_w, target_box_h
         proportions = self.calculate_lock_on_proportion(target_coordinates, bbox_coordinates)
         self.lock_on_status(proportions, frame)
-
+        
+        # Display server time on the image
+        if server_time_msg:
+            current_time_text = f"Time: {server_time_msg.time_unix_usec / 1e6:.2f}"  # Format time as desired
+            text_size, _ = cv2.getTextSize(current_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            text_x = frame.shape[1] - text_size[0] - 10
+            text_y = text_size[1] + 10
+            cv2.putText(frame, current_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            
         try:
             # Convert OpenCV image back to ROS Image message
             processed_image_msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
@@ -118,21 +124,10 @@ class BBoxDrawerNode:
         cv2.putText(image_msg, elapsed_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
         return elapsed_time
 
-# TODO complete this function 
-    def fetch_server_time(self, image_msg):
-        current_time_msg = None
-        
-        if current_time_msg:
-            current_time_text = f"Time: {current_time_msg.time_unix_usec / 1e6}"  # Format time as desired
-            text_size, _ = cv2.getTextSize(current_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2) 
-            text_x = image_msg.shape[1] - text_size[0] - 10
-            text_y = text_size[1] + 10
-            cv2.putText(image_msg, current_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2) 
-    # it must return server time 
 
 if __name__ == '__main__':
-    rospy.init_node('bbox_drawer_node', anonymous=True)
-    bbox_drawer_node = BBoxDrawerNode()
+    rospy.init_node('image_processor_node', anonymous=True)
+    image_processor_node = ImageProcessorNode()
     try:
         rospy.spin()
     except KeyboardInterrupt:
