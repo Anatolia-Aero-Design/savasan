@@ -4,7 +4,7 @@ import logging
 
 app = Flask(__name__)
 
-@app.route('/update_data', methods=['POST'])
+@app.route('/api/telemetri_gonder', methods=['POST'])
 def update_data():
     json_data = request.get_json()
     competition.update_contestant(request.get_json('takim_numarasi') , json_data)
@@ -12,7 +12,7 @@ def update_data():
     
     return jsonify(response), 200
 
-@app.route('/get_server_time', methods=['GET'])
+@app.route('/api/sunucusaati', methods=['GET'])
 def get_server_time():
     current_time = competition.get_current_time()  # Add a method to get only the current time
     return jsonify({"sunucusaati": current_time}), 200
