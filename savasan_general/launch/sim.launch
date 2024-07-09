@@ -23,6 +23,7 @@
     <!-- server_comm Node Configuration -->
     <node name="comm_node" pkg="server_comm" type="comm_node.py" output="screen">
         <param name="/api/telemetri_gonder" value="http://10.42.0.1:5000/api/telemetri_gonder" /> <!-- Update it according to your server IP -->
+        <param name="/api/sunucusaati" value="http://10.42.0.1:5000/api/sunucusaati" />
     </node>
 
     <node name="camera_publisher" pkg="image_handler" type="camera_publisher.py" output="screen"/>
