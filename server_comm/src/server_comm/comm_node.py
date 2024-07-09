@@ -67,7 +67,6 @@ class Comm_Node:
                 "IHA_otonom": 1,
                 "sunucusaati": server_time  # Add server time to data
             }
-            print(data_dict["sunucusaati"])
             logging.info("Prepared data dictionary for server update.")
             
             # Send data to the server
@@ -115,7 +114,14 @@ class Comm_Node:
             if response.status_code == 200:
                 server_time = response.json().get('sunucusaati')
                 logging.info(f"Server time retrieved successfully: {server_time}")
-                return server_time
+                formatted_time_dict = {
+                "gun": server_time["gun"],
+                "saat": server_time["saat"],
+                "dakika": server_time["dakika"],
+                "saniye": server_time["saniye"],
+                "milisaniye": server_time["milisaniye"]
+                }
+                return formatted_time_dict
             else:
                 logging.error(f"Failed to retrieve server time, status code: {response.status_code}")
                 return None
