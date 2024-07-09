@@ -7,6 +7,10 @@ from image_processor.msg import Yolo_xywh  # Adjust this import based on your me
 import cv2
 import message_filters
 import time
+import sys
+sys.path.insert(1, '/home/valvarn/catkin_ws/src/savasan/server_comm/src/server_comm')
+
+import comm_node 
 
 class ImageProcessorNode:
     def __init__(self):
@@ -30,7 +34,8 @@ class ImageProcessorNode:
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")
             return
-
+        self.server_time_printer(frame)
+        
         # Draw bounding box
         bbox_x, bbox_y, bbox_w, bbox_h = bbox_msg.x, bbox_msg.y, bbox_msg.w, bbox_msg.h
         if bbox_x != 0 or bbox_y != 0 or bbox_w != 0 or bbox_h != 0:
@@ -47,7 +52,7 @@ class ImageProcessorNode:
         target_coordinates = target_box_x, target_box_y, target_box_w, target_box_h
         proportions = self.calculate_lock_on_proportion(target_coordinates, bbox_coordinates)
         self.lock_on_status(proportions, frame)
-      
+        
         try:
             # Convert OpenCV image back to ROS Image message
             processed_image_msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
@@ -112,6 +117,18 @@ class ImageProcessorNode:
         text_y = int((image_msg.shape[0] + text_size[1]) / 2)
         cv2.putText(image_msg, elapsed_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
         return elapsed_time
+    
+    def server_time_printer(self, image_msg):
+        server_time = comm_node.Comm_Node()
+        server_time = server_time.get_server_time()
+        server_time_text = f"{server_time}"
+        text_size, _ = cv2.getTextSize(server_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+        # Calculate the position for the top-right corner
+        text_x = int(image_msg.shape[1] - text_size[0] - 10)  # 10 pixels padding from right edge
+        text_y = int(text_size[1] + 10)  # 10 pixels padding from top edge
+
+        # Put the text on the image
+        cv2.putText(image_msg, server_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
 
 
 if __name__ == '__main__':
