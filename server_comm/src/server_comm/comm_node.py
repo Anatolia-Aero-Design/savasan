@@ -9,7 +9,7 @@ from mavros_msgs.msg import State
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 import requests
 import logging
-from server_comm.msg import KonumBilgileri, KonumBilgisi, ServerTime
+from server_comm.msg import KonumBilgileri, KonumBilgisi
 from utils import quaternion_to_euler, calculate_speed
 
 # Configure logging
@@ -39,20 +39,11 @@ def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
 
         logging.info("Prepared data dictionary for server update.")
         
-        server_url_update = rospy.get_param('/update_data')
-        get_server_time_url = rospy.get_param('/get_server_time')
+        server_url_update = rospy.get_param('/comm_node/server_url')
         
         # Send data to the server
         response = requests.post(server_url_update, json=data_dict)
         logging.info(f"Sent data to server: {data_dict}")
-
-        # Fetch server time
-        server_time = fetch_server_time(get_server_time_url)
-        if server_time:
-            logging.info(f"Server time: {server_time}")
-            publish_server_time(server_time)
-        else:
-            logging.warning("Failed to fetch server time.")
             
         # Check server response
         if response.status_code == 200:
@@ -63,30 +54,6 @@ def callback(imu_msg, battery_msg, rel_altitude_msg, position_msg, speed_msg):
 
     except Exception as e:
         logging.error(f"An error occurred in callback: {str(e)}")
-
-def fetch_server_time(server_url):
-    try:
-        response = requests.get(server_url)
-        response.raise_for_status()  # Raise an HTTPError on bad responses
-        data_dict = response.json()
-        sunucusaati = data_dict.get('sunucusaati', {})
-        return sunucusaati
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Failed to fetch data from server: {e}")
-        return None 
-
-def publish_server_time(server_time):
-    try:
-        server_time_msg = ServerTime()
-        server_time_msg.gun = server_time.get('gun', 0)
-        server_time_msg.saat = server_time.get('saat', 0)
-        server_time_msg.dakika = server_time.get('dakika', 0)
-        server_time_msg.saniye = server_time.get('saniye', 0)
-        server_time_msg.milisaniye = server_time.get('milisaniye', 0)
-        server_time_pub.publish(server_time_msg)
-        logging.info("Published server time message.")
-    except Exception as e:
-        logging.error(f"An error occurred while publishing server time: {str(e)}")
 
 def parse_and_publish_konumBilgileri(response_json):
     try:
@@ -132,9 +99,8 @@ def synchronize_topics():
         )
         sync.registerCallback(callback)
         
-        global konum_pub, server_time_pub
+        global konum_pub
         konum_pub = rospy.Publisher('konum_bilgileri', KonumBilgileri, queue_size=10)
-        server_time_pub = rospy.Publisher('get_server_time', ServerTime, queue_size=10)
 
         logging.info("Synchronize topics node started.")
         rospy.spin()

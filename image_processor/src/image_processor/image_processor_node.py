@@ -4,7 +4,6 @@ import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from image_processor.msg import Yolo_xywh  # Adjust this import based on your message definition
-from server_comm.msg import ServerTime
 import cv2
 import message_filters
 import time
@@ -17,16 +16,14 @@ class ImageProcessorNode:
         # Subscribers using message_filters for synchronization
         image_sub = message_filters.Subscriber("/camera/image_raw", Image)
         bbox_sub = message_filters.Subscriber("/yolov8/xywh", Yolo_xywh)  # Adjust topic and message type
-        server_time_sub = message_filters.Subscriber("/get_server_time", ServerTime)
 
-        self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub, server_time_sub], 
-                                                              queue_size=60, slop=0.001, allow_headerless=True) 
+        self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub], queue_size=60, slop=0.001) 
         self.ts.registerCallback(self.callback)
         
         # Publisher for processed images
         self.image_pub = rospy.Publisher("/camera/image_processed", Image, queue_size=60)
     
-    def callback(self, image_msg, bbox_msg, server_time_msg):
+    def callback(self, image_msg, bbox_msg):
         try:
             # Convert ROS Image message to OpenCV image
             frame = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
@@ -50,15 +47,7 @@ class ImageProcessorNode:
         target_coordinates = target_box_x, target_box_y, target_box_w, target_box_h
         proportions = self.calculate_lock_on_proportion(target_coordinates, bbox_coordinates)
         self.lock_on_status(proportions, frame)
-        
-        # Display server time on the image
-        if server_time_msg:
-            current_time_text = f"Time: {server_time_msg.time_unix_usec / 1e6:.2f}"  # Format time as desired
-            text_size, _ = cv2.getTextSize(current_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
-            text_x = frame.shape[1] - text_size[0] - 10
-            text_y = text_size[1] + 10
-            cv2.putText(frame, current_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-            
+      
         try:
             # Convert OpenCV image back to ROS Image message
             processed_image_msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
