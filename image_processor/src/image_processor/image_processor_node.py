@@ -56,7 +56,7 @@ class ImageProcessorNode:
         bbox_coordinates = bbox_x, bbox_y, bbox_w, bbox_h
         target_coordinates = target_box_x, target_box_y, target_box_w, target_box_h
         proportions = self.calculate_lock_on_proportion(target_coordinates, bbox_coordinates)
-        self.lock_on_status(proportions, frame)
+        lock_on_status, kilit = self.lock_on_status(proportions, frame)
 
         try:
             # Convert OpenCV image back to ROS Image message
@@ -66,6 +66,9 @@ class ImageProcessorNode:
             
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")
+
+        self.lock_on_pub.publish(lock_on_status)
+        self.kilit_pub.publish(kilit)
               
     # Calculate bounding box proportion to the target area 
     def calculate_lock_on_proportion(self, target_coordinates, bbox_coordinates):
