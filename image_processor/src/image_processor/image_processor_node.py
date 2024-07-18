@@ -12,8 +12,10 @@ from image_processor.msg import Yolo_xywh  # Adjust this import based on your me
 import cv2
 import message_filters
 import time
+from std_msgs.msg import Int32, Bool, String
+import json
 
-class BBoxDrawerNode:
+class ImageProcessorNode:
     def __init__(self):
         self.bridge = CvBridge()
         self.start_time = None
@@ -27,6 +29,9 @@ class BBoxDrawerNode:
 
         # Publisher for processed images
         self.image_pub = rospy.Publisher("/camera/image_processed", Image, queue_size=60)
+        self.lock_on_pub = rospy.Publisher("/lock_on_status", Bool, queue_size=10)
+        self.kilit_pub = rospy.Publisher("/kilit", Bool, queue_size=10)
+        self.server_time_sub = rospy.Subscriber('/server_time', String, self.server_time_callback)
     
     def callback(self, image_msg, bbox_msg):
         try:
@@ -132,7 +137,7 @@ class BBoxDrawerNode:
 
 if __name__ == '__main__':
     rospy.init_node('bbox_drawer_node', anonymous=True)
-    bbox_drawer_node = BBoxDrawerNode()
+    image_processor_node = ImageProcessorNode()
     try:
         rospy.spin()
     except KeyboardInterrupt:
