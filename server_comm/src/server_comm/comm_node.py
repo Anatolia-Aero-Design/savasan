@@ -101,7 +101,7 @@ class Comm_Node:
                 konum_bilgisi.takim_numarasi = item["takim_numarasi"]
 
                 konumBilgileri_msg.konumBilgileri.append(konum_bilgisi)
-
+                
             self.konum_pub.publish(konumBilgileri_msg)  
             logging.info("Published konumBilgileri message.")
 
@@ -128,7 +128,8 @@ class Comm_Node:
         except Exception as e:
             logging.error(f"An error occurred while retrieving server time: {str(e)}")
             return None
-
+   
+    
 if __name__ == '__main__':
     rospy.init_node('comm_node', anonymous=True)
     comm_node = Comm_Node()
