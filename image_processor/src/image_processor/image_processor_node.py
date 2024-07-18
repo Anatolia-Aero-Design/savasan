@@ -15,11 +15,15 @@ import time
 from std_msgs.msg import Int32, Bool, String
 import json
 
+
+
 class ImageProcessorNode:
+
     def __init__(self):
         self.bridge = CvBridge()
         self.start_time = None
-        
+        rospy.init_node('image_processor_node', anonymous=True)
+          
         # Subscribers using message_filters for synchronization
         image_sub = message_filters.Subscriber("/camera/image_raw", Image)
         bbox_sub = message_filters.Subscriber("/yolov8/xywh", Yolo_xywh)  # Adjust topic and message type
@@ -32,20 +36,27 @@ class ImageProcessorNode:
         self.lock_on_pub = rospy.Publisher("/lock_on_status", Bool, queue_size=10)
         self.kilit_pub = rospy.Publisher("/kilit", Bool, queue_size=10)
         self.server_time_sub = rospy.Subscriber('/server_time', String, self.server_time_callback)
-    
+        
+        self.server_time = None
+
+
     def callback(self, image_msg, bbox_msg):
+
+
         try:
             # Convert ROS Image message to OpenCV image
             frame = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")
             return
+        
+        self.server_time_printer(frame)
 
         # Draw bounding box
         bbox_x, bbox_y, bbox_w, bbox_h = bbox_msg.x, bbox_msg.y, bbox_msg.w, bbox_msg.h
         if bbox_x != 0 or bbox_y != 0 or bbox_w != 0 or bbox_h != 0:
             cv2.rectangle(frame, (bbox_x, bbox_y), (bbox_w, bbox_h), (0, 0, 255), 2) # thickness max value must be 3
-                                                                                     # color must be red (0, 0, 255)
+                                                                                     # color must be red (0, 0, 255)                                                                        
         # Draw target area
         target_box_x = int(1280 * 0.25)
         target_box_y = int(720 * 0.1)
@@ -97,12 +108,17 @@ class ImageProcessorNode:
         return horizontal_proportion, vertical_proportion
     
     def lock_on_status(self, proportions, image_msg):
-        lock_on_status = None
+        lock_on_status = False
+        kilit = False
         if lock_on_status is not True and proportions[0] >= 0.93 and proportions[1] >= 0.93: # 0.05 is error threshold for proportions
             elapsed_time = self.timer(image_msg) # start timer when contact is made
             if elapsed_time >= 4.00:
                 lock_on_status = True
                 print("Success") # TODO success message will be sent to comm and package will be sent to server from comm
+
+            if elapsed_time > 0.00:
+                kilit = True
+
         else:
             elapsed_time_text = f"Lock-on-time: 0.00"
             text_size, _ = cv2.getTextSize(elapsed_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2) 
@@ -111,7 +127,7 @@ class ImageProcessorNode:
             cv2.putText(image_msg, elapsed_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             self.start_time = None
             lock_on_status = False 
-        return lock_on_status
+        return lock_on_status, kilit
     
     def timer(self, image_msg):
         if self.start_time is None:
@@ -125,21 +141,41 @@ class ImageProcessorNode:
         text_y = int((image_msg.shape[0] + text_size[1]) / 2)
         cv2.putText(image_msg, elapsed_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
         return elapsed_time
+    
+    def server_time_callback(self, msg):
+        self.server_time = json.loads(msg.data)
 
-# TODO complete this function 
-    def fetch_server_time(self, image_msg):
-        current_time_msg = None
-        
-        if current_time_msg:
-            current_time_text = f"Time: {current_time_msg.time_unix_usec / 1e6}"  # Format time as desired
-            text_size, _ = cv2.getTextSize(current_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2) 
-            text_x = image_msg.shape[1] - text_size[0] - 10
-            text_y = text_size[1] + 10
-            cv2.putText(image_msg, current_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2) 
-    # it must return server time 
+    def image_callback(self, msg):
+        try:
+            # Convert the ROS Image message to OpenCV format
+            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            
+            # Process the image (e.g., display server time) 
+            self.server_time_printer(cv_image)
+            
+            # Display the image
+            cv2.imshow("Image Window", cv_image)
+            cv2.waitKey(3)
+            
+        except CvBridgeError as e:
+            rospy.logerr(f"CvBridge Error: {e}")
+    
+    def server_time_printer(self, image_msg):
+      if self.server_time:
+        server_time_text = f"{self.server_time['saat']}:{self.server_time['dakika']}:{self.server_time['saniye']}.{self.server_time['milisaniye']}"
+        text_size, _ = cv2.getTextSize(server_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+        # Calculate the position for the top-right corner
+        text_x = int(image_msg.shape[1] - text_size[0] - 10)  # 10 pixels padding from right edge
+        text_y = int(text_size[1] + 10)  # 10 pixels padding from top edge
+
+        # Put the text on the image
+        cv2.putText(image_msg, server_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+
 
 if __name__ == '__main__':
-    rospy.init_node('bbox_drawer_node', anonymous=True)
+
+
+    rospy.init_node('image_processor_node', anonymous=True)
     image_processor_node = ImageProcessorNode()
     try:
         rospy.spin()
