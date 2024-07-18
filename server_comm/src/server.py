@@ -15,7 +15,7 @@ def update_data():
     return jsonify(response), 200
 
 @app.route('/api/kilitlenme_bilgisi', methods=['POST'])
-def update_lock_on():
+def kenetlenme_bilgisi_gonder():
     json_data = request.get_json()
     print(f"Received lock-on data: {json_data}")
     competition.update_lock_on(json_data)
