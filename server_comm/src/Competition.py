@@ -22,6 +22,10 @@ class Competition():
             self.contestants.append(contestant)
         else:
             self.contestants[contestant_index].update(json_data)
+
+    def update_lock_on(self, json_data):
+        self.lock_on_info.append(json_data)
+        print(f"Updated lock-on info: {json_data}")
         
     
     def response_json(self):
@@ -43,3 +47,13 @@ class Competition():
         
         
         return response_json
+
+    def get_current_time(self):
+        current_time = datetime.now()
+        return {
+            "gun": current_time.day,
+            "saat": current_time.hour,
+            "dakika": current_time.minute,
+            "saniye": current_time.second,
+            "milisaniye": current_time.microsecond // 1000 
+        }
