@@ -35,7 +35,6 @@ class GPSNavigator:
             return
 
         try:
-            
             latitude = msg.konumBilgileri[1].IHA_enlem            
             longitude = msg.konumBilgileri[1].IHA_boylam
             altitude = msg.konumBilgileri[1].IHA_irtifa

@@ -15,6 +15,13 @@ class Contestant():
         self.yaw = json_data['IHA_yatis']
         self.speed = json_data['IHA_hiz']
         self.battery = json_data['IHA_batarya']
+        self.otonom = json_data['IHA_otonom']
+        self.kilitlenme = json_data['iha_kilitlenme']
+        self.merkez_X = json_data['hedef_merkez_X']
+        self.merkez_Y = json_data['hedef_merkez_Y']
+        self.genislik = json_data['hedef_genislik']
+        self.yukseklik = json_data['hedef_yukseklik']
+        self.sunucusaati = json_data['sunucusaati']
         time.sleep(1)
         
     def get_info(self):
