@@ -18,18 +18,22 @@ class ImageProcessorNode:
         self.server_time = None
         
         # Subscribers using message_filters for synchronization
-        image_sub = message_filters.Subscriber("/camera/image_raw", Image)
-        bbox_sub = message_filters.Subscriber("/yolov8/xywh", Yolo_xywh)  # Adjust topic and message type
+        self.image_sub = message_filters.Subscriber("/camera/image_raw", Image)
+        self.bbox_sub = message_filters.Subscriber("/yolov8/xywh", Yolo_xywh)  # Adjust topic and message type
         self.server_time_sub = rospy.Subscriber('/server_time', String, self.server_time_callback)
-
-        self.ts = message_filters.ApproximateTimeSynchronizer([image_sub, bbox_sub], 60, 0.001)
+        
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.bbox_sub], 60, 0.001)
         self.ts.registerCallback(self.callback)
-
+        
         # Publisher for processed images
         self.image_pub = rospy.Publisher("/camera/image_processed", Image, queue_size=60)
         self.lock_on_pub = rospy.Publisher("/lock_on_status", Bool, queue_size=10)
         self.kilit_pub = rospy.Publisher("/kilit", Bool, queue_size=10)  
-        
+    
+    def server_time_callback(self, msg):
+        self.server_time = msg.data
+        rospy.loginfo(f"Received server time")
+      
     def callback(self, image_msg, bbox_msg):
         try:
             # Convert ROS Image message to OpenCV image
@@ -54,6 +58,7 @@ class ImageProcessorNode:
         target_coordinates = target_box_x, target_box_y, target_box_w, target_box_h
         proportions = self.calculate_lock_on_proportion(target_coordinates, bbox_coordinates)
         lock_on_status, kilit = self.lock_on_status(proportions, frame)
+        self.overlay_server_time(frame)
 
         try:
             # Convert OpenCV image back to ROS Image message
@@ -120,13 +125,10 @@ class ImageProcessorNode:
         text_y = int((frame.shape[0] + text_size[1]) / 2)
         cv2.putText(frame, elapsed_time_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
         return elapsed_time
-    
-    def server_time_callback(self, msg):
-        self.server_time = msg  
         
     def overlay_server_time(self, frame):
         if self.server_time:
-            server_time_text = self.server_time
+            server_time_text = str(self.server_time)
             text_size, _ = cv2.getTextSize(server_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
             text_x = int(frame.shape[1] - text_size[0] - 10)
             text_y = int(text_size[1] + 10)

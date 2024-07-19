@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from pandas import json_normalize
 import rospy
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix
 from nav_msgs.msg import Odometry
@@ -18,25 +19,11 @@ from image_processor.msg import Yolo_xywh
 
 class Comm_Node:
     def __init__(self):
+        
         # Get server APIs from sim.launch params
         self.server_url_telemetri_gonder = rospy.get_param('/comm_node/api/telemetri_gonder')
         self.server_url_kilitlenme_bilgisi = rospy.get_param('/comm_node/api/kilitlenme_bilgisi')
         self.server_url_sunucusaati = rospy.get_param('/comm_node/api/sunucusaati')
-
-        # Initialize Subscribers
-        self.imu_sub = rospy.Subscriber('/mavros/imu/data', Imu, self.imu_callback)
-        self.battery_sub = rospy.Subscriber('/mavros/battery', BatteryState, self.battery_callback)
-        self.rel_altitude_sub = rospy.Subscriber('/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
-        self.position_sub = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.position_callback)
-        self.speed_sub = rospy.Subscriber('/mavros/local_position/velocity_local', TwistStamped, self.speed_callback)
-        self.state_sub = rospy.Subscriber('/mavros/state', State, self.state_callback)
-        self.lock_on_sub = rospy.Subscriber('/lock_on_status', Bool, self.lock_on_callback)
-        self.kilit_sub = rospy.Subscriber('/kilit', Bool, self.kilit_callback)
-        self.bbox_sub = rospy.Subscriber("/yolov8/xywh", Yolo_xywh, self.bbox_callback)
-        
-        # Initialize Publishers
-        self.server_time_pub = rospy.Publisher('/server_time', String, queue_size=10)
-        self.konum_pub = rospy.Publisher('/konum_bilgileri', KonumBilgileri, queue_size=10)
 
         self.imu = None
         self.battery = None
@@ -56,6 +43,29 @@ class Comm_Node:
         self.start_time = None
         self.end_time = None
         self.kilit_prev = None
+        
+        try:
+            # Initialize Subscribers
+            self.imu_sub = rospy.Subscriber('/mavros/imu/data', Imu, self.imu_callback)
+            self.battery_sub = rospy.Subscriber('/mavros/battery', BatteryState, self.battery_callback)
+            self.rel_altitude_sub = rospy.Subscriber('/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
+            self.position_sub = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.position_callback)
+            self.speed_sub = rospy.Subscriber('/mavros/local_position/velocity_local', TwistStamped, self.speed_callback)
+            self.state_sub = rospy.Subscriber('/mavros/state', State, self.state_callback)
+            self.lock_on_sub = rospy.Subscriber('/lock_on_status', Bool, self.lock_on_callback)
+            self.kilit_sub = rospy.Subscriber('/kilit', Bool, self.kilit_callback)
+            self.bbox_sub = rospy.Subscriber("/yolov8/xywh", Yolo_xywh, self.bbox_callback)
+        
+        except Exception as e:
+            print("error")
+            logging.error(f"An error occurred in process_data: {str(e)}")
+        
+        finally:
+            self.process_data()
+        
+        # Initialize Publishers
+        self.server_time_pub = rospy.Publisher('/server_time', String, queue_size=10)
+        self.konum_pub = rospy.Publisher('/konum_bilgileri', KonumBilgileri, queue_size=10)
 
         # Configure logging
         logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -102,8 +112,8 @@ class Comm_Node:
         self.process_data()
 
     def process_data(self):
-        if not (self.imu and self.battery and self.rel_alt and self.position and self.speed and self.state):
-            return
+        #if not (self.imu and self.battery and self.rel_alt and self.position and self.speed and self.state):
+        #    return
 
         if self.state.mode == 'AUTO' or self.state.mode.startswith('GUIDED'):
             IHA_otonom = 1  # Set to 1 for autonomous modes
@@ -241,7 +251,8 @@ class Comm_Node:
                     "saniye": server_time["saniye"],
                     "milisaniye": server_time["milisaniye"]
                 }
-                self.server_time_pub.publish(time_dict)
+                time_dict_str = json.dumps(time_dict)
+                self.server_time_pub.publish(time_dict_str)
                 return time_dict
             else:
                 logging.error(f"Failed to retrieve server time, status code: {response.status_code}")
