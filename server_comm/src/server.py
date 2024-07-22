@@ -27,8 +27,8 @@ def hss_coordinates():
 
 @app.route('/api/qr_koordinati', methods=['GET'])
 def get_qr_coordinates():
-    qr_latitude = None
-    qr_longtitude = None
+    qr_latitude = 47
+    qr_longtitude = 50
     qr_coordinates = {
         "qrEnlem": qr_latitude,
         "qrBoylam": qr_longtitude

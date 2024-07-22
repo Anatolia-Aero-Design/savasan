@@ -25,10 +25,13 @@
         <param name="/api/telemetri_gonder" value="http://10.42.0.1:5000/api/telemetri_gonder" /> <!-- Update it according to your server IP -->
         <param name="/api/kilitlenme_bilgisi" value="http://10.42.0.1:5000/api/kilitlenme_bilgisi" />
         <param name="/api/sunucusaati" value="http://10.42.0.1:5000/api/sunucusaati" />
+        <param name="/api/qr_koordinati" value="http://10.42.0.1:5000/api/qr_koordinati" />
+        <param name="/api/kamikaze_bilgisi" value="http://10.42.0.1:5000/api/kamikaze_bilgisi" />
     </node>
 
     <node name="camera_publisher" pkg="image_handler" type="camera_publisher.py" output="screen"/>
 
+    <node name ="QR_node" pkg="kamikaze" type="QR_node.py" output="screen" />
     <node name="yolov8_node" pkg="yolov8" type="yolov8_node.py" output="screen"/>
     <node name="image_processor_node" pkg="image_processor" type="image_processor_node.py" output="screen"/>
     <node name="image_save" pkg="image_processor" type="image_save.py" output="screen"/>

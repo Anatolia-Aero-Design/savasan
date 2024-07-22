@@ -112,16 +112,16 @@ class Comm_Node:
         self.process_data()
 
     def process_data(self):
-        #if not (self.imu and self.battery and self.rel_alt and self.position and self.speed and self.state):
-        #    return
-
+        if not (self.imu and self.battery and self.rel_alt and self.position and self.speed and self.state):
+            return
+            
         if self.state.mode == 'AUTO' or self.state.mode.startswith('GUIDED'):
             IHA_otonom = 1  # Set to 1 for autonomous modes
         else:
             IHA_otonom = 0  # Set to 0 for manual modes
 
         iha_kilitlenme = 1 if self.kilit else 0
-
+        
         try:
             # Convert quaternion to euler angles
             roll, pitch, yaw = quaternion_to_euler(self.imu.orientation.x,
@@ -146,9 +146,8 @@ class Comm_Node:
                 "hedef_merkez_Y": self.bbox_y,
                 "hedef_genislik": self.bbox_w,
                 "hedef_yukseklik": self.bbox_h,
-                "sunucusaati": self.get_server_time()
+                "gps_saati": None # TODO gps time taken from fcu will be written here 
             }
-
             logging.info("Prepared data dictionary for server update.")
 
             # Send data to the server
@@ -161,7 +160,7 @@ class Comm_Node:
                 self.parse_and_publish_konumBilgileri(response.json())
             else:
                 logging.error(f"Failed to send data, status code: {response.status_code}")
-
+                            
         except Exception as e:
             logging.error(f"An error occurred in process_data: {str(e)}")
 
@@ -195,7 +194,7 @@ class Comm_Node:
         now = datetime.now()
         return now.hour, now.minute, now.second, now.microsecond
         
-    def send_lock_on_info(self, kilit_msg, lock_on_msg):
+    def send_lock_on_info(self, kilit_msg, lock_on_msg): # while this function is running server communication is being lost
         while True:
             if kilit_msg is None and self.kilit_prev is None:
                 pass
@@ -206,7 +205,7 @@ class Comm_Node:
             elif self.kilit_prev is True and kilit_msg is True or self.kilit_prev is False and kilit_msg is True:
                 self.start_time = self.get_current_time()
 
-            elif self.kilit_prev is True and kilit_msg is False:
+            elif self.kilit_prev is True and kilit_msg is False and lock_on_msg is True:
                 self.end_time = self.get_current_time()
 
                 if lock_on_msg:
@@ -226,6 +225,7 @@ class Comm_Node:
                             },
                             "otonom_kilitlenme": 1
                         }
+                        print(data_dict)
                         response = requests.post(self.server_url_kilitlenme_bilgisi, json=data_dict)
                         if response.status_code == 200:
                             logging.info(f"Lock-on data sent successfully: {response.json()}")
@@ -244,16 +244,9 @@ class Comm_Node:
             if response.status_code == 200:
                 server_time = response.json().get('sunucusaati')
                 logging.info(f"Server time retrieved successfully: {server_time}")
-                time_dict = {
-                    "gun": server_time["gun"],
-                    "saat": server_time["saat"],
-                    "dakika": server_time["dakika"],
-                    "saniye": server_time["saniye"],
-                    "milisaniye": server_time["milisaniye"]
-                }
-                time_dict_str = json.dumps(time_dict)
-                self.server_time_pub.publish(time_dict_str)
-                return time_dict
+                time_str = f"{server_time['gun']}.{server_time['saat']}.{server_time['dakika']}.{server_time['saniye']}.{server_time['milisaniye']}"
+                self.server_time_pub.publish(time_str)
+                return time_str
             else:
                 logging.error(f"Failed to retrieve server time, status code: {response.status_code}")
                 return None
