@@ -32,6 +32,7 @@
     <node name="camera_publisher" pkg="image_handler" type="camera_publisher.py" output="screen"/>
 
     <node name ="QR_node" pkg="kamikaze" type="QR_node.py" output="screen" />
+    <node name ="waypoint_node" pkg="kamikaze" type="waypoint.py" output="screen" />
     <node name="yolov8_node" pkg="yolov8" type="yolov8_node.py" output="screen"/>
     <node name="image_processor_node" pkg="image_processor" type="image_processor_node.py" output="screen"/>
     <node name="image_save" pkg="image_processor" type="image_save.py" output="screen"/>
