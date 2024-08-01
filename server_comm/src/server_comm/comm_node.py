@@ -4,7 +4,6 @@ from pandas import json_normalize
 import rospy
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix
 from nav_msgs.msg import Odometry
-from rospy_message_converter import message_converter
 from std_msgs.msg import Float64, Bool, String
 from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State

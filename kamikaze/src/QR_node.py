@@ -9,22 +9,28 @@ from mavros_msgs.msg import WaypointList, Waypoint
 from mavros_msgs.srv import WaypointPush, WaypointClear
 from std_srvs.srv import Empty, EmptyResponse
 from std_msgs.msg import String
-from waypoint import Waypoint_node
+from waypoint import WaypointNode
 from pyzbar.pyzbar import decode
+import tf.transformations as tf
 
 
 class QR_Node:
     def __init__(self) -> None:
         self.bridge = CvBridge()
-        self.image_sub = None # Initialize image subscriber as None
+        
+        # Initialize image subscribers as None
+        self.image_sub = None 
+        self.waypoint_sub = None
+        
         self.qr_data = None
+
         
         self.qr_pub = rospy.Publisher('/qr_code_data', String, queue_size=10)
         self.image_pub = rospy.Publisher('camera/kamikaze_image', Image, queue_size=60)
+        self.attitude_pub = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         
         # Services to start and stop the mission
         self.start_service = rospy.Service('start_kamikaze', Empty, self.start_mission) 
-        self.stop_service = rospy.Service('stop_kamikaze', Empty, self.stop_mission)
     
     def start_mission(self, req):
         if self.image_sub is None:
@@ -32,8 +38,10 @@ class QR_Node:
             rospy.loginfo("Kamikaze mission started.")
         return EmptyResponse()
     
-    def stop_mission(self, req):
-        pass
+    def abort_mission(self, req):
+        ...
+    
+
     
     def qr_reader(self, frame):
         decoded_objects = decode(frame)
@@ -49,9 +57,6 @@ class QR_Node:
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")
             return
-        
-        waypoints = Waypoint_node()
-        waypoints.waypoints()
         self.qr_reader(frame)
         
         try:
