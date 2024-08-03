@@ -105,3 +105,47 @@ def calculate_waypoint(latitude, longitude, distance, bearing):
     longitude_dest = math.degrees(longitude_dest_rad)
 
     return latitude_dest, longitude_dest
+
+def vector_angle(a, b):
+    # Calculate the dot product of vectors a and b
+    dot_product = sum(a[i] * b[i] for i in range(len(a)))
+    
+    # Calculate the magnitudes of vectors a and b
+    mag_a = math.sqrt(sum(a[i] ** 2 for i in range(len(a))))
+    mag_b = math.sqrt(sum(b[i] ** 2 for i in range(len(b))))
+    
+    # Calculate the cosine of the angle
+    cos_theta = dot_product / (mag_a * mag_b)
+    
+    # Handle floating point precision issues
+    cos_theta = max(-1.0, min(1.0, cos_theta))
+    
+    # Calculate the angle in radians
+    angle_rad = math.acos(cos_theta)
+    
+    # Convert the angle to degrees
+    angle_deg = math.degrees(angle_rad)
+    
+    return angle_deg
+
+def vector_angle_2d(a, b):
+    # Calculate the dot product of vectors a and b
+    dot_product = a[0] * b[0] + a[1] * b[1]
+    
+    # Calculate the magnitudes of vectors a and b
+    mag_a = math.sqrt(a[0] ** 2 + a[1] ** 2)
+    mag_b = math.sqrt(b[0] ** 2 + b[1] ** 2)
+    
+    # Calculate the cosine of the angle
+    cos_theta = dot_product / (mag_a * mag_b)
+    
+    # Handle floating point precision issues
+    cos_theta = max(-1.0, min(1.0, cos_theta))
+    
+    # Calculate the angle in radians
+    angle_rad = math.acos(cos_theta)
+    
+    # Convert the angle to degrees
+    angle_deg = math.degrees(angle_rad)
+    
+    return angle_deg

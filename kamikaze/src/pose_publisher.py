@@ -21,7 +21,7 @@ class Pose_Publisher_Node:
         self.home_sub= rospy.Subscriber('/mavros/home_position/home', HomePosition, self.home_callback)
 
         # Publisher
-        self.vector_marker_pub = rospy.Publisher('/uav_to_target_vector', Marker, queue_size=10)
+        self.vector_pub = rospy.Publisher('/uav_to_target_vector', Vector3, queue_size=10)
 
         self.uav_position = None
         self.home_pose = None
@@ -42,37 +42,12 @@ class Pose_Publisher_Node:
         if self.uav_position is not None :
 
             x, y, z = pm.geodetic2enu(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, 0, self.home_pose[0], self.home_pose[1], self.TARGET_ALTITUDE)
-            marker = Marker()
-            marker.header.frame_id = "map"
-            marker.header.stamp = rospy.Time.now()
-            marker.ns = "vector"
-            marker.id = 0
-            marker.type = Marker.ARROW
-            marker.action = Marker.ADD
+            vector = Vector3()
+            vector.x = x
+            vector.y = y
+            vector.z = z
 
-            start_point = Point()
-            start_point.x = self.uav_position[0]
-            start_point.y = self.uav_position[1]
-            start_point.z = self.uav_position[2]
-
-            end_point = Point()
-            end_point.x = x
-            end_point.y = y
-            end_point.z = z
-
-            marker.points.append(start_point)
-            marker.points.append(end_point)
-
-            marker.scale.x = 0.5  # Shaft diameter
-            marker.scale.y = 0.3   # Head diameter
-            marker.scale.z = 0.3   # Head length
-
-            marker.color.a = 1.0  # Alpha
-            marker.color.r = 1.0  # Red
-            marker.color.g = 0.0  # Green
-            marker.color.b = 0.0  # Blue
-
-            self.vector_marker_pub.publish(marker)
+            self.vector_pub.publish(vector)
             
 if __name__ == '__main__':
     try:
