@@ -41,8 +41,6 @@ class QR_Node:
     def abort_mission(self, req):
         ...
     
-
-    
     def qr_reader(self, frame):
         decoded_objects = decode(frame)
         for obj in decoded_objects:

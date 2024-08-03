@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from numpy import NaN
 import rospy
 from mavros_msgs.srv import CommandInt, SetMode
 from sensor_msgs.msg import NavSatFix
@@ -42,6 +43,7 @@ class WaypointNode:
         self.command_int_srv = rospy.ServiceProxy('/mavros/cmd/command_int', CommandInt)
         
         # Subscribe to the GLOBAL_POSITION_INT topic
+
         self.subscriber = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.position_callback)
         self.rel_altitude_sub = rospy.Subscriber('/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
 
@@ -70,7 +72,7 @@ class WaypointNode:
         try:
             self.get_coordinates()
             rospy.loginfo("Waypoint calculations started.")
-            self.waypoint_pusher()
+            self.callback()
             return EmptyResponse()
         except rospy.ServiceException as e:
             rospy.logerr("Service call failed: %s", e)
@@ -97,8 +99,8 @@ class WaypointNode:
             z = altitude
 
             # Create the CommandInt request
-            response = self.command_int_srv(broadcast = False, frame = 3, command = 192, current = 0, autocontinue = True, 
-                                           param1 = 0, param2 = 0, param3 = 0, param4 = 0, x = x, y = y, z = z)
+            response = self.command_int_srv(broadcast = False, frame = 3, command = 192, current = 0, autocontinue = False, 
+                                           param1 = 0, param2 = 0, param3 = 30, param4 = NaN, x = x, y = y, z = z)
 
             if response.success:
                 rospy.loginfo(f"Current position: ({self.latitude}, {self.longitude}, {self.altitude})")
@@ -109,31 +111,20 @@ class WaypointNode:
         except rospy.ServiceException as e:
             rospy.logerr(f"Service call failed: {e}")
 
-    def waypoint_pusher(self):
+    def callback(self):
         self.set_mode("GUIDED")
         rospy.sleep(2)  # Ensure the mode change has taken effect
 
-        calculated_waypoints = utils.calculate_waypoints_with_angle(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE,
-                                                                    self.HOME_ALTITUDE, self.angle_degrees, 250, 150, 100)
-        self.calculated_waypoints = calculated_waypoints
-
-        for i, waypoint in enumerate(calculated_waypoints):
-            self.send_position_command(waypoint[0], waypoint[1], waypoint[2])
-            rospy.loginfo(f"Sent waypoint {i+1}: ({waypoint[0]}, {waypoint[1]}, {waypoint[2]})")
-
-            # Wait until the waypoint is reached
-            while not self.waypoint_reached:
-                self.waypoint_reached = utils.is_waypoint_reached(self.latitude, self.longitude, self.altitude, 
-                                                                waypoint[0], waypoint[1], waypoint[2])
-                if self.waypoint_reached:
-                    rospy.loginfo(f"Reached waypoint {i+1}: ({waypoint[0]}, {waypoint[1]}, {waypoint[2]})")
-                    break
-                else:
-                    rospy.loginfo(f"Waiting to reach waypoint {i+1}: ({waypoint[0]}, {waypoint[1]}, {waypoint[2]})")
-                rospy.sleep(1)  # Check every second
-
-        rospy.loginfo("Waypoints sent successfully!")
+        self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
+        rospy.loginfo(f"Heading to target position")
+        distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
+        if distance <= 100:
+            ...
         
+    def calculate_vectors(self):
+        ...
+            
+            
     def set_mode(self, mode):
         try:
             rospy.wait_for_service('/mavros/set_mode', timeout=5)
