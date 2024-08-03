@@ -5,7 +5,6 @@ import rospy
 from geometry_msgs.msg import PoseStamped, Vector3, Point
 from mavros_msgs.msg import HomePosition
 import numpy as np
-import requests
 import utilities as utils
 from visualization_msgs.msg import Marker
 

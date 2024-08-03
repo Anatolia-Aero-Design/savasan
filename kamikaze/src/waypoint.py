@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from numpy import NaN
-import tf.transformations as tf_trans
 import rospy
 import math
 from mavros_msgs.srv import CommandInt, SetMode
@@ -11,7 +10,6 @@ from geometry_msgs.msg import Quaternion, PoseStamped, Vector3
 from std_msgs.msg import Float64
 from std_srvs.srv import Empty, EmptyResponse
 import utilities as utils
-import requests
 from visualization_msgs.msg import Marker
 
 class PIDController:
@@ -36,13 +34,9 @@ class AttitudeController:
 
     def set_attitude(self, roll, pitch, yaw, thrust):
         attitude = AttitudeTarget()
-        attitude.orientation = self.euler_to_quaternion(roll, pitch, yaw)
+        attitude.orientation = utils.euler_to_quaternion(roll, pitch, yaw)
         attitude.thrust = thrust
         self.attitude_pub.publish(attitude)
-
-    def euler_to_quaternion(self, roll, pitch, yaw):
-        quaternion = tf_trans.quaternion_from_euler(roll, pitch, yaw)
-        return Quaternion(*quaternion)
 
 class WaypointNode:
     def __init__(self) -> None:
@@ -54,8 +48,6 @@ class WaypointNode:
         
         self.qr_info = None
         self.angle_degrees = 70
-        self.calculated_waypoints = None 
-        self.waypoint_reached = False
         self.quaternion = None
         self.x, self.y, self.z = None, None, None
         self.vector = None
@@ -66,9 +58,9 @@ class WaypointNode:
         self.HOME_ALTITUDE = 100
         
         # Target coordinates
-        self.TARGET_LATITUDE = None
-        self.TARGET_LONGITUDE = None
-        self.TARGET_ALTITUDE = 15.0
+        self.TARGET_LATITUDE = -35.360849
+        self.TARGET_LONGITUDE = 149.161835
+        self.TARGET_ALTITUDE = 0
         
         self.attitude_controller = AttitudeController()
         
@@ -76,9 +68,6 @@ class WaypointNode:
         self.yaw_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
         self.pitch_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
         self.prev_time = rospy.get_time()
-
-        # API URLs
-        self.server_url_qr_koordinati = rospy.get_param('/comm_node/api/qr_koordinati')
         
         # Initialize services
         self.start_service = rospy.Service('start_waypoint_calculations', Empty, self.start_waypoint)
@@ -93,11 +82,10 @@ class WaypointNode:
         self.vector_sub = rospy.Subscriber('/uav_to_target_vector', Vector3, self.vector_callback)
         self.subscriber = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.position_callback)
         self.rel_altitude_sub = rospy.Subscriber('/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
-        
-        self.timer = rospy.Timer(rospy.Duration(1.0), self.timer_callback)  # 1 Hz
+
 
     def quaternion_callback(self, data):
-        self.x, self.y, self.z = self.quaternion_to_euler_degrees(data.pose.orientation)
+        self.x, self.y, self.z = utils.quaternion_to_euler_degrees(data.pose.orientation)
         
     def vector_callback(self, data):
         self.vector = data
@@ -133,56 +121,24 @@ class WaypointNode:
             yaw = self.perform_yaw_correction(yaw_error, dt)
             rospy.loginfo(f"Yaw error: {yaw_error}")
         
-        if distance <= 100:
+        if distance <= 50:
             pitch = self.perform_pitch_correction(pitch_error, dt)
             rospy.loginfo(f"Pitch error: {pitch_error}")
             
             self.perform_dive_maneuver(yaw, pitch)
             if self.qr_info is not None or self.altitude <= 30:
                 self.perform_climb_maneuver(60)
-
-    def quaternion_to_euler_degrees(self, quaternion):
-        # Convert quaternion to Euler angles (roll, pitch, yaw) in radians
-        euler_angles_rad = tf_trans.euler_from_quaternion((quaternion.x, quaternion.y,quaternion.z,quaternion.w))
-        
-        # Convert Euler angles from radians to degrees
-        euler_angles_deg = [math.degrees(angle) for angle in euler_angles_rad]
-        
-        return euler_angles_deg
-
-    def get_coordinates(self):
-        try:
-            response = requests.get(self.server_url_qr_koordinati)
-            if response.status_code == 200:
-                json_data = response.json()
-                self.TARGET_LATITUDE = json_data.get("qrEnlem")
-                self.TARGET_LONGITUDE = json_data.get("qrBoylam")
-                rospy.loginfo(f"QR Latitude: {self.TARGET_LATITUDE}, QR Longitude: {self.TARGET_LONGITUDE}")
-            else:
-                rospy.logwarn(f"Error: Unable to fetch data from URL. Status code: {response.status_code}")
-        except Exception as e:
-            rospy.logerr(f"Error: {e}")
             
     def start_waypoint(self, req):
         try:
-            self.get_coordinates()
             rospy.loginfo("Waypoint calculations started.")
-            self.callback()
             return EmptyResponse()
         except rospy.ServiceException as e:
             rospy.logerr("Service call failed: %s", e)
             return EmptyResponse()
 
     def abort_mission(self, req):
-        try:
-            # Abort the mission by sending the last calculated waypoint
-            if self.calculated_waypoints:
-                self.send_position_command(self.calculated_waypoints[3][0], self.calculated_waypoints[3][1], self.HOME_ALTITUDE)
-            rospy.loginfo("Aborting mission.")
-            return EmptyResponse()
-        except rospy.ServiceException as e:
-            rospy.logerr(f"Service call failed: {e}")
-            return EmptyResponse()
+        ...
 
     def send_position_command(self, latitude, longitude, altitude):
         try:
@@ -241,6 +197,11 @@ class WaypointNode:
         self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
         
     def calculate_errors(self):
+        # Ensure self.vector is not None
+        if self.vector is None:
+            rospy.logwarn("Vector data is not available yet.")
+            return 0, 0
+
         # Calculate the yaw error
         current_yaw = self.z
         target_yaw = math.degrees(math.atan2(self.vector.y, self.vector.x))
@@ -249,16 +210,16 @@ class WaypointNode:
         # Normalize yaw error to the range [-180, 180]
         yaw_error = ((yaw_error + 180) % 360) - 180
         rospy.loginfo(f"Yaw error: {yaw_error}")
-        
+
         # Calculate the pitch error
         current_pitch = self.y
         distance_2d = math.sqrt(self.vector.x**2 + self.vector.y**2)
         target_pitch = math.degrees(math.atan2(self.vector.z, distance_2d))
         pitch_error = target_pitch - current_pitch
         rospy.loginfo(f"Pitch error: {pitch_error}")
-        
-        return yaw_error, pitch_error    
-            
+
+        return yaw_error, pitch_error
+  
     def set_mode(self, mode):
         try:
             rospy.wait_for_service('/mavros/set_mode', timeout=5)

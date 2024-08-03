@@ -1,4 +1,7 @@
 import math
+from scipy.spatial.transform import Rotation as R
+import tf.transformations as tf_trans
+from geometry_msgs.msg import Quaternion
 
 def haversine_formula(latitude_1, longtitude_1, latitude_2, longtitude_2):
     R = 6371000 # Radius of the Earth in meters
@@ -16,6 +19,25 @@ def haversine_formula(latitude_1, longtitude_1, latitude_2, longtitude_2):
     distance = R * c
     return distance
 
+def euler_to_quaternion(roll, pitch, yaw):
+    quaternion = tf_trans.quaternion_from_euler(roll, pitch, yaw)
+    return Quaternion(*quaternion)
+
+def quaternion_to_euler(x, y, z, w):
+    quat = [w, x, y, z]  # Quaternion sırası w, x, y, z
+    r = R.from_quat(quat)
+    euler = r.as_euler('zyx', degrees=True)  # Yaw, Pitch, Roll sırası
+    return euler[0], euler[1], euler[2]
+
+def quaternion_to_euler_degrees(quaternion):
+    # Convert quaternion to Euler angles (roll, pitch, yaw) in radians
+    euler_angles_rad = tf_trans.euler_from_quaternion((quaternion.x, quaternion.y,quaternion.z,quaternion.w))
+    
+    # Convert Euler angles from radians to degrees
+    euler_angles_deg = [math.degrees(angle) for angle in euler_angles_rad]
+    
+    return euler_angles_deg
+
 def calculate_bearing(latitude_1, longitude_1, latitude_2, longitude_2):
     latitude_1_rad = math.radians(latitude_1)
     latitude_2_rad = math.radians(latitude_2)
@@ -32,21 +54,6 @@ def calculate_bearing(latitude_1, longitude_1, latitude_2, longitude_2):
     bearing_deg = (bearing_deg + 360) % 360  # Normalize to [0, 360)
     
     return bearing_deg
-
-def is_waypoint_reached(current_lat, current_lon, current_alt, 
-                        target_latitude, target_longitude, target_altitude, tolerance=40.0, altitude_tolerance=1.0):
-
-    distance = haversine_formula(latitude_1 = current_lat, latitude_2 = target_latitude, 
-                                 longtitude_1 = current_lon, longtitude_2 = target_longitude)
-    print(f"Distance is {distance}")
-    
-    altitude_dif = abs(current_alt - target_altitude)
-    print(f"Altitude dif is: {altitude_dif}")
-    
-    if distance <= tolerance and altitude_dif <= altitude_tolerance:
-        return True
-    else:
-        return False 
 
 
 def calculate_waypoint_sequance(target_lat, target_lon, target_alt, home_alt,
