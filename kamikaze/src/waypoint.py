@@ -97,16 +97,11 @@ class WaypointNode:
         
     def rel_altitude_callback(self, data):
         self.altitude = float(data.data) # Extract data from the message
-        
-    def timer_callback(self, event):
-        self.callback()
 
     def callback(self):
         if self.latitude is None or self.longitude is None or self.altitude is None:
             return
-        
         distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
-        rospy.loginfo(f"Distance to target: {distance} meters")
         
         roll_error, pitch_error = self.calculate_errors()
 
@@ -115,25 +110,26 @@ class WaypointNode:
         self.prev_time = current_time        
         
         if distance >= 100:
-            self.set_mode("GUIDED")
             self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
-        
-        elif 50 < distance <= 100:
-            roll = self.perform_roll_correction(roll_error, dt)
-            rospy.loginfo(f"Roll error: {roll_error}")
-        elif distance <= 50:
-            pitch = self.perform_pitch_correction(pitch_error, dt)
-            rospy.loginfo(f"Pitch error: {pitch_error}")
+            while True:
+                rospy.loginfo(f"Distance to target: {distance} meters")
+                distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
+                if 50 < distance <= 100:
+                    roll = self.perform_roll_correction(roll_error, dt)
+                    rospy.loginfo(f"Roll error: {roll_error}")
+                elif distance <= 50:
+                    pitch = self.perform_pitch_correction(pitch_error, dt)
+                    rospy.loginfo(f"Pitch error: {pitch_error}")
 
-            self.perform_dive_maneuver(0, pitch)
-            if self.qr_info is not None or self.altitude <= 30:
-                self.perform_climb_maneuver(-20)
+                    self.perform_dive_maneuver(0, pitch)
+                    if self.qr_info is not None or self.altitude <= 30:
+                        self.perform_climb_maneuver(-20)
+                        break    
     
     def start_waypoint(self, req):
         try:
             rospy.loginfo("Waypoint calculations started.")
-            # Timer for constant distance calculation and corrections
-            self.timer = rospy.Timer(rospy.Duration(1), self.timer_callback)
+            self.callback()
             return EmptyResponse()
         except rospy.ServiceException as e:
             rospy.logerr("Service call failed: %s", e)
@@ -229,7 +225,8 @@ class WaypointNode:
 
 if __name__ == '__main__':
     rospy.init_node('waypoint_node', anonymous=True)
-    WaypointNode()
+    reposition = WaypointNode()
+    reposition.set_mode("GUIDED")
     try:
         rospy.spin()
     except Exception as e:
