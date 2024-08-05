@@ -2,32 +2,29 @@
 
 import pymap3d as pm
 import rospy
-from geometry_msgs.msg import PoseStamped, Vector3, Point
+from geometry_msgs.msg import PoseStamped, Vector3
 from mavros_msgs.msg import HomePosition
 import numpy as np
 import utilities as utils
 from visualization_msgs.msg import Marker
 
-class Pose_Publisher_Node:
-    def __init__(self) -> None:
-        rospy.init_node('position_vector_publisher', anonymous=True)
+class PosePublisherNode:
+    def __init__(self) -> None:    
+        # Initialize variables
+        self.uav_position = None
+        self.home_pose = None
 
-        # API URLs
-        self.server_url_qr_koordinati = rospy.get_param('/comm_node/api/qr_koordinati')
-        
+        # Constants
+        self.TARGET_LATITUDE = -35.360849
+        self.TARGET_LONGITUDE = 149.161835
+        self.TARGET_ALTITUDE = 10
+
         # Subscribers
         self.uav_pose_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.uav_pose_callback)
-        self.home_sub= rospy.Subscriber('/mavros/home_position/home', HomePosition, self.home_callback)
+        self.home_sub = rospy.Subscriber('/mavros/home_position/home', HomePosition, self.home_callback)
 
         # Publisher
         self.vector_pub = rospy.Publisher('/uav_to_target_vector', Vector3, queue_size=10)
-
-        self.uav_position = None
-        self.home_pose = None
-        self.TARGET_LATITUDE = -35.360849
-        self.TARGET_LONGITUDE = 149.161835
-        self.TARGET_ALTITUDE = 0
-            
             
     def uav_pose_callback(self, data):
         self.uav_position = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z])
@@ -38,19 +35,24 @@ class Pose_Publisher_Node:
         self.publish_vector()
 
     def publish_vector(self):
-        if self.uav_position is not None :
+        if self.uav_position is not None and self.home_pose is not None:
+            try:
+                x, y, z = pm.geodetic2enu(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE, self.home_pose[0], self.home_pose[1], self.TARGET_ALTITUDE)
+                vector = Vector3()
+                vector.x = x
+                vector.y = y
+                vector.z = z
 
-            x, y, z = pm.geodetic2enu(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, 0, self.home_pose[0], self.home_pose[1], self.TARGET_ALTITUDE)
-            vector = Vector3()
-            vector.x = x
-            vector.y = y
-            vector.z = z
-
-            self.vector_pub.publish(vector)
+                self.vector_pub.publish(vector)
+            except Exception as e:
+                rospy.logerr(f"Failed to publish vector: {e}")
+        else:
+            rospy.logwarn("UAV position or home pose not available yet.")
             
 if __name__ == '__main__':
     try:
-        Pose_Publisher_Node()
+        rospy.init_node('pose_publisher_node', anonymous=True)
+        PosePublisherNode()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

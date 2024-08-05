@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import dis
 from numpy import NaN
 import rospy
 import math
@@ -60,12 +61,12 @@ class WaypointNode:
         # Target coordinates
         self.TARGET_LATITUDE = -35.360849
         self.TARGET_LONGITUDE = 149.161835
-        self.TARGET_ALTITUDE = 0
+        self.TARGET_ALTITUDE = 10 # small positive value for safety purposes (plane denies value of 0)
         
         self.attitude_controller = AttitudeController()
         
-        # Initialize PID controllers for yaw and pitch
-        self.yaw_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
+        # Initialize PID controllers for roll and pitch
+        self.roll_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
         self.pitch_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
         self.prev_time = rospy.get_time()
         
@@ -82,8 +83,7 @@ class WaypointNode:
         self.vector_sub = rospy.Subscriber('/uav_to_target_vector', Vector3, self.vector_callback)
         self.subscriber = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.position_callback)
         self.rel_altitude_sub = rospy.Subscriber('/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
-
-
+        
     def quaternion_callback(self, data):
         self.x, self.y, self.z = utils.quaternion_to_euler_degrees(data.pose.orientation)
         
@@ -99,39 +99,41 @@ class WaypointNode:
         self.altitude = float(data.data) # Extract data from the message
         
     def timer_callback(self, event):
-        # Timer callback to repeatedly call the main logic
         self.callback()
 
     def callback(self):
-        self.set_mode("GUIDED")
-        rospy.sleep(2)  # Ensure the mode change has taken effect
-
-        self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
-        rospy.loginfo(f"Heading to target position")
-        distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
+        if self.latitude is None or self.longitude is None or self.altitude is None:
+            return
         
-        print(distance)
-        yaw_error, pitch_error = self.calculate_errors()
-        # Get the current time for dt calculation
+        distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
+        rospy.loginfo(f"Distance to target: {distance} meters")
+        
+        roll_error, pitch_error = self.calculate_errors()
+
         current_time = rospy.get_time()
         dt = current_time - self.prev_time
-        self.prev_time = current_time
+        self.prev_time = current_time        
         
-        if distance <= 100:
-            yaw = self.perform_yaw_correction(yaw_error, dt)
-            rospy.loginfo(f"Yaw error: {yaw_error}")
+        if distance >= 100:
+            self.set_mode("GUIDED")
+            self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
         
-        if distance <= 50:
+        elif 50 < distance <= 100:
+            roll = self.perform_roll_correction(roll_error, dt)
+            rospy.loginfo(f"Roll error: {roll_error}")
+        elif distance <= 50:
             pitch = self.perform_pitch_correction(pitch_error, dt)
             rospy.loginfo(f"Pitch error: {pitch_error}")
-            
-            self.perform_dive_maneuver(yaw, pitch)
+
+            self.perform_dive_maneuver(0, pitch)
             if self.qr_info is not None or self.altitude <= 30:
-                self.perform_climb_maneuver(60)
-            
+                self.perform_climb_maneuver(-20)
+    
     def start_waypoint(self, req):
         try:
             rospy.loginfo("Waypoint calculations started.")
+            # Timer for constant distance calculation and corrections
+            self.timer = rospy.Timer(rospy.Duration(1), self.timer_callback)
             return EmptyResponse()
         except rospy.ServiceException as e:
             rospy.logerr("Service call failed: %s", e)
@@ -144,14 +146,12 @@ class WaypointNode:
         try:
             rospy.wait_for_service('/mavros/cmd/command_int')
 
-            # Convert latitude and longitude to the required format (1e7)
             x = int(latitude * 1e7)
             y = int(longitude * 1e7)
             z = altitude
 
-            # Create the CommandInt request
             response = self.command_int_srv(broadcast = False, frame = 3, command = 192, current = 0, autocontinue = False, 
-                                           param1 = 0, param2 = 0, param3 = 30, param4 = NaN, x = x, y = y, z = z)
+                                           param1 = 30, param2 = 0, param3 = 30, param4 = NaN, x = x, y = y, z = z)
 
             if response.success:
                 rospy.loginfo(f"Current position: ({self.latitude}, {self.longitude}, {self.altitude})")
@@ -162,16 +162,16 @@ class WaypointNode:
         except rospy.ServiceException as e:
             rospy.logerr(f"Service call failed: {e}")
         
-    def perform_yaw_correction(self, yaw_error, dt):
-        """Perform yaw correction based on error."""
-        yaw_correction = self.yaw_pid.compute(yaw_error, dt)
-        yaw = math.radians(yaw_correction)
-        roll = 0.0
+    def perform_roll_correction(self, roll_error, dt):
+        """Perform roll correction based on error."""
+        roll_correction = self.roll_pid.compute(roll_error, dt)
+        roll = math.radians(roll_correction)
         pitch = 0
+        yaw = 0
         thrust = 0.5
-        rospy.loginfo(f"Performing yaw correction with error: {yaw_error:.2f} degrees")
+        rospy.loginfo(f"Performing roll correction with error: {roll_error:.2f} degrees")
         self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
-        return yaw
+        return roll
 
     def perform_pitch_correction(self, pitch_error, dt):
         """Perform pitch correction based on error."""
@@ -185,41 +185,36 @@ class WaypointNode:
         return pitch
 
     def perform_dive_maneuver(self, yaw, pitch):
-        # Apply corrections to the attitude controller
-        roll = 0.0  # or calculate if needed
-        thrust = 0.5  # Adjust as needed for your maneuver
+        roll = 0.0
+        thrust = 0.5
         self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
     
-    def perform_climb_maneuver(self, pitch):
+    def perform_climb_maneuver(self, pitch_deg):
         yaw = 0
-        roll = 0.0  # or calculate if needed
-        thrust = 0.5  # Adjust as needed for your maneuver
+        roll = 0.0
+        pitch = math.radians(pitch_deg)
+        thrust = 0.5
         self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
         
     def calculate_errors(self):
-        # Ensure self.vector is not None
         if self.vector is None:
             rospy.logwarn("Vector data is not available yet.")
             return 0, 0
 
-        # Calculate the yaw error
-        current_yaw = self.z
-        target_yaw = math.degrees(math.atan2(self.vector.y, self.vector.x))
-        yaw_error = target_yaw - current_yaw
+        current_roll = self.x
+        target_roll = math.degrees(math.atan2(self.vector.y, self.vector.x))
+        roll_error = target_roll - current_roll
+        roll_error = ((roll_error + 180) % 360) - 180
+        rospy.loginfo(f"Roll error: {roll_error}")
 
-        # Normalize yaw error to the range [-180, 180]
-        yaw_error = ((yaw_error + 180) % 360) - 180
-        rospy.loginfo(f"Yaw error: {yaw_error}")
-
-        # Calculate the pitch error
         current_pitch = self.y
         distance_2d = math.sqrt(self.vector.x**2 + self.vector.y**2)
         target_pitch = math.degrees(math.atan2(self.vector.z, distance_2d))
         pitch_error = target_pitch - current_pitch
         rospy.loginfo(f"Pitch error: {pitch_error}")
 
-        return yaw_error, pitch_error
-  
+        return roll_error, pitch_error
+
     def set_mode(self, mode):
         try:
             rospy.wait_for_service('/mavros/set_mode', timeout=5)
@@ -230,8 +225,7 @@ class WaypointNode:
             else:
                 rospy.logwarn(f"Failed to set mode to {mode}")
         except rospy.ServiceException as e:
-            rospy.logerr(f"Service call failed: {e}")        
-
+            rospy.logerr(f"Service call failed: {e}")     
 
 if __name__ == '__main__':
     rospy.init_node('waypoint_node', anonymous=True)

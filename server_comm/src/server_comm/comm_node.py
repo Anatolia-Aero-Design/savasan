@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 
-from pandas import json_normalize
 import rospy
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix
-from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64, Bool, String
-from geometry_msgs.msg import TwistStamped, PoseStamped
+from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
 import requests
 import json
 import logging
 from server_comm.msg import KonumBilgileri, KonumBilgisi
-from utils import quaternion_to_euler, calculate_speed, mode_guided
+from utils import quaternion_to_euler, calculate_speed
 from datetime import datetime
 import time
 from image_processor.msg import Yolo_xywh
@@ -257,16 +255,6 @@ class Comm_Node:
             logging.error(f"An error occurred while retrieving server time: {str(e)}")
             return None
         
-    def get_coordinates(self):
-        try:
-            response = requests.get(self.server_url_qr_koordinati)
-            if response.status_code == 200:
-                json_data = response.json()
-                self.qr_pose_pub.publish(json_data)
-            else:
-                rospy.logwarn(f"Error: Unable to fetch data from URL. Status code: {response.status_code}")
-        except Exception as e:
-            rospy.logerr(f"Error: {e}")
 
 if __name__ == '__main__':
     rospy.init_node('comm_node', anonymous=True)
