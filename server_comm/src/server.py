@@ -23,7 +23,36 @@ def get_server_time():
 
 @app.route('/api/hss_koordinatlari', methods=['GET'])
 def hss_coordinates():
-    ...
+    hss_koordinatlari = {
+        "sunucusaati": competition.get_current_time(),
+        "hss_koordinat_bilgileri": [
+            {
+                "id": 0,
+                "hssEnlem": -35.360947,
+                "hssBoylam": 149.164313,
+                "hssYaricap": 50
+            },
+            {
+                "id": 1,
+                "hssEnlem": -35.362358,
+                "hssBoylam": 149.167855,
+                "hssYaricap": 50
+            },
+            {
+                "id": 2,
+                "hssEnlem": -35.364373,
+                "hssBoylam": 149.163976,
+                "hssYaricap": 75
+            },
+            {
+                "id": 3,
+                "hssEnlem": -35.362722,
+                "hssBoylam": 149.160419,
+                "hssYaricap": 150
+            }
+        ]
+    }
+    return jsonify(hss_koordinatlari), 200
 
 @app.route('/api/qr_koordinati', methods=['GET'])
 def get_qr_coordinates():

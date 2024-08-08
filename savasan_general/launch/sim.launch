@@ -27,15 +27,17 @@
         <param name="/api/sunucusaati"        value="http://127.0.0.1:5000/api/sunucusaati" />
         <param name="/api/qr_koordinati"      value="http://127.0.0.1:5000/api/qr_koordinati" />
         <param name="/api/kamikaze_bilgisi"   value="http://127.0.0.1:5000/api/kamikaze_bilgisi" />
+        <param name="/api/hss_koordinatlari"  value="http://127.0.0.1:5000/api/hss_koordinatlari" />
     </node>
 
     <node name="camera_publisher"     pkg="image_handler"     type="camera_publisher.py"      output="screen"/>
-    <node name ="waypoint_node"       pkg="kamikaze"          type="waypoint.py"              output="screen" />
-    <node name ="pose_publisher_node" pkg="kamikaze"          type="pose_publisher.py"        output="screen" />
+    <node name="waypoint_node"        pkg="kamikaze"          type="waypoint.py"              output="screen" />
+    <node name="pose_publisher_node"  pkg="kamikaze"          type="pose_publisher.py"        output="screen" />
     <node name="yolov8_node"          pkg="yolov8"            type="yolov8_node.py"           output="screen"/>
     <node name="image_processor_node" pkg="image_processor"   type="image_processor_node.py"  output="screen"/>
     <node name="image_save"           pkg="image_processor"   type="image_save.py"            output="screen"/>
     <node name="gps_navigator"        pkg="gps_navigator"     type="gps_navigator_node.py"    output="screen"/>
+    <node name="air_defense_node"     pkg="hss"               type="air_defense_node.py"      output="screen"/>
     <node name="uav_visualization"    pkg="uav_visualization" type="iha_subscriber.py"        output="screen"/>
     <node name="home_gps_publisher"   pkg="savasan_general"   type="home_gps_publisher.py"    output="screen"/> <!-- Home GPS Publisher -->
 
