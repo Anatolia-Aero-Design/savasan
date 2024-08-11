@@ -1,29 +1,28 @@
 #!/usr/bin/env python
 
 import rospy
-from rospy import ROSException
-from mavros_msgs.srv import CommandTOL, CommandTOLResponse
-from mavros_msgs.msg import Waypoint, WaypointList
-from mavros_msgs.srv import WaypointPush, WaypointClear
+from mavros_msgs.srv import CommandInt
+from mavros_msgs.msg import CommandCode
 from std_srvs.srv import Empty, EmptyResponse
 import requests
 import logging
+from mavros_msgs.srv import WaypointPush
 
 class Air_Defense_Node:
     def __init__(self) -> None:
         self.server_url_hss_koordinatlari = rospy.get_param('/comm_node/api/hss_koordinatlari')
         self.waypoint_push_srv = rospy.ServiceProxy('/mavros/mission/push', WaypointPush)
-        self.waypoint_clear_srv = rospy.ServiceProxy('/mavros/mission/clear', WaypointClear)
-
-        self.parsed_list = []
+        self.command_int_srv = rospy.ServiceProxy('/mavros/cmd/command_int', CommandInt)
+        
+        self.parsed_list = {}
         self.geofence_list = []
-
+        
         self.start_service = rospy.Service('enable_geo_fences', Empty, self.enable_geo_fences)
         
     def enable_geo_fences(self, req):
         try:
             self.parse_coordinates()
-            #self.upload_geofences()
+            self.send_geofences()
             rospy.loginfo("Geofences enabled!")
             return EmptyResponse()
         except rospy.ServiceException as e:
@@ -45,57 +44,67 @@ class Air_Defense_Node:
             return None
     
     def parse_coordinates(self):
-        test_waypoints = [
-            Waypoint(
-                frame=3,
-                command=16,
-                is_current=False,
-                autocontinue=True,
-                param1=0,
-                param2=0,
-                param3=0,
-                param4=0,
-                x_lat=-35.360947,
-                y_long=149.164313,
-                z_alt=0
-            ),
-            Waypoint(
-                frame=3,
-                command=16,
-                is_current=False,
-                autocontinue=True,
-                param1=0,
-                param2=0,
-                param3=0,
-                param4=0,
-                x_lat=-35.362358,
-                y_long=149.167855,
-                z_alt=0
-            )
-        ]
-        try:
-            rospy.loginfo("Uploading test waypoints...")
-            response = self.waypoint_push_srv(waypoints=test_waypoints)
-            if response.success:
-                rospy.loginfo("Test waypoints uploaded successfully.")
-            else:
-                rospy.logwarn("Failed to upload test waypoints.")
-        except ROSException as e:
-            rospy.logerr(f"Unexpected error occurred: {e}")
+        data_dict = self.get_coordinates()
+        if data_dict is None:
+            rospy.logwarn("No data received from the coordinates server.")
+            return
+        
+        self.geofence_list = []
+        for item in data_dict:
+            hssEnlem = item["hssEnlem"]
+            hssBoylam = item["hssBoylam"]
+            hssYaricap = item["hssYaricap"]
+            self.geofence_list.append({
+                "hssEnlem": hssEnlem,
+                "hssBoylam": hssBoylam,
+                "hssYaricap": hssYaricap
+            })
+        return self.geofence_list
 
-    def upload_geofences(self):
-        try:
-            # Clear existing waypoints
-            self.waypoint_clear_srv()
+    def send_geofences(self):
+        try:    
+            # Enable geofence system
+            self.send_command(CommandCode.DO_FENCE_ENABLE, 1)
+
+            # Send each geofence circle exclusion
+            for i, geofence in enumerate(self.geofence_list):
+                # Sending a circular exclusion zone
+                self.send_command(
+                    CommandCode.NAV_FENCE_CIRCLE_EXCLUSION,
+                    geofence["hssYaricap"],  # Radius
+                    geofence["hssEnlem"],    # Latitude
+                    geofence["hssBoylam"],   # Longitude
+                    0, 0, 0, 0, 
+                )
             
-            # Upload new waypoints
-            response = self.waypoint_push_srv(waypoints=self.geofence_list)
-            if response.success:
-                rospy.loginfo("Geofence waypoints uploaded successfully.")
-            else:
-                rospy.logwarn("Failed to upload geofence waypoints.")
+            # Complete the geofence definition
+            self.send_command(CommandCode.DO_FENCE_ENABLE, 0)
         except Exception as e:
             rospy.logerr(f"Unexpected error occurred: {e}")
+    
+    def send_command(self, command, param1, param2=2, param3=0, param4=0, x=0, y=0, z=0):
+        try:
+            rospy.wait_for_service('/mavros/cmd/command_int')
+            response = self.command_int_srv(
+                broadcast=False,
+                frame=3,
+                command=command,
+                current=0,
+                autocontinue=False, 
+                param1=param1,
+                param2=param2,
+                param3=param3,
+                param4=param4,
+                x=x,
+                y=y,
+                z=z
+            )
+            if response.success:
+                rospy.loginfo(f"Command {command} sent to plane successfully")
+            else:
+                rospy.logwarn(f"Failed to send command {command}")
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Service call failed: {e}")
 
 if __name__ == '__main__':
     try:
@@ -104,3 +113,4 @@ if __name__ == '__main__':
         rospy.spin()
     except rospy.ROSInterruptException as e:
         rospy.logerr(f"ROS Interrupt: {e}")
+

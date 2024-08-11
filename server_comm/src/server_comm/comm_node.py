@@ -6,7 +6,6 @@ from std_msgs.msg import Float64, Bool, String
 from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
 import requests
-import json
 import logging
 from server_comm.msg import KonumBilgileri, KonumBilgisi
 from utils import quaternion_to_euler, calculate_speed

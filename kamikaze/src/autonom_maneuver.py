@@ -5,8 +5,8 @@ import rospy
 import math
 from mavros_msgs.srv import CommandInt, SetMode
 from mavros_msgs.msg import AttitudeTarget
-from sensor_msgs.msg import NavSatFix, Imu
-from geometry_msgs.msg import Quaternion, PoseStamped, Vector3
+from sensor_msgs.msg import NavSatFix
+from geometry_msgs.msg import PoseStamped, Vector3
 from std_msgs.msg import Float64
 from std_srvs.srv import Empty, EmptyResponse
 import utilities as utils
@@ -37,11 +37,8 @@ class AttitudeController:
         attitude.thrust = thrust
         self.attitude_pub.publish(attitude)
 
-class WaypointNode:
+class AutonomNode:
     def __init__(self) -> None:
-        # Initialize node
-        rospy.init_node('waypoint_node', anonymous=True)
-
         # Initialize variables
         self.latitude = None
         self.longitude = None
@@ -51,14 +48,14 @@ class WaypointNode:
         self.vector = None
         
         # Home coordinates
-        self.HOME_LATITUDE = -35.363212
-        self.HOME_LONGITUDE = 149.165210
-        self.HOME_ALTITUDE = 100
+        self.HOME_LATITUDE  = 36.9377791
+        self.HOME_LONGITUDE = 35.5353955
+        self.HOME_ALTITUDE  = 100
         
         # Target coordinates
-        self.TARGET_LATITUDE = -35.360849
-        self.TARGET_LONGITUDE = 149.161835
-        self.TARGET_ALTITUDE = 100  # Small positive value for safety purposes (plane denies value of 0)
+        self.TARGET_LATITUDE  = 36.938828
+        self.TARGET_LONGITUDE = 35.532133
+        self.TARGET_ALTITUDE  = 100  # Small positive value for safety purposes (plane denies value of 0)
         
         self.attitude_controller = AttitudeController()
         
@@ -66,11 +63,10 @@ class WaypointNode:
         self.roll_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
         self.pitch_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
         self.prev_time = rospy.get_time()
-        
-        # Initialize services
+
         self.start_service = rospy.Service('start_waypoint_calculations', Empty, self.start_waypoint)
         self.abort_service = rospy.Service('abort_kamikaze_mission', Empty, self.abort_mission)
-
+        
         # Set mode service
         self.set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
         self.command_int_srv = rospy.ServiceProxy('/mavros/cmd/command_int', CommandInt)
@@ -78,53 +74,8 @@ class WaypointNode:
         # Initialize Subscribers
         self.pose_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.quaternion_callback)
         self.vector_sub = rospy.Subscriber('/uav_to_target_vector', Vector3, self.vector_callback)
-        self.subscriber = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.position_callback)
+        self.global_pos_sub = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.position_callback)
         self.rel_altitude_sub = rospy.Subscriber('/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
-        
-    def quaternion_callback(self, data):
-        self.x, self.y, self.z = utils.quaternion_to_euler_degrees(data.pose.orientation)
-        
-    def vector_callback(self, data):
-        self.vector = data
-    
-    def position_callback(self, data):
-        self.latitude = float(data.latitude)
-        self.longitude = float(data.longitude)
-        
-    def rel_altitude_callback(self, data):
-        self.altitude = float(data.data)
-        
-    def callback(self):
-        if self.latitude is None or self.longitude is None or self.altitude is None:
-            return
-
-        distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
-
-        if distance >= 100:
-            self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
-            self.correct_heading()
-    
-    def correct_heading(self):
-        while True:
-            distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
-            rospy.loginfo(f"Distance to target: {distance} meters")
-            
-            roll_error, pitch_error = self.calculate_errors()
-            current_time = rospy.get_time()
-            dt = current_time - self.prev_time
-            self.prev_time = current_time
-            
-            if 50 < distance <= 100:
-                self.perform_roll_correction(roll_error, dt)
-                rospy.loginfo(f"Roll error: {roll_error}")
-                if distance <= 50:
-                    self.perform_pitch_correction(pitch_error, dt)
-                    rospy.loginfo(f"Pitch error: {pitch_error}")
-                    self.perform_dive_maneuver(0, pitch_error)
-                    if self.qr_info or self.altitude <= 30:
-                        self.perform_climb_maneuver(-20)
-                        break
-            rospy.sleep(0.5)
     
     def start_waypoint(self, req):
         try:
@@ -138,7 +89,54 @@ class WaypointNode:
     def abort_mission(self, req):
         rospy.logwarn("Mission aborted.")
         return EmptyResponse()
+    
+    def quaternion_callback(self, data):
+        self.x, self.y, self.z = utils.quaternion_to_euler_degrees(data.pose.orientation)
+        
+    def vector_callback(self, data):
+        self.vector = data
+        #rospy.loginfo(f"Updated vector: x={self.vector.x}, y={self.vector.y}, z={self.vector.z}")
+    
+    def position_callback(self, data):
+        self.latitude = float(data.latitude)
+        self.longitude = float(data.longitude)
+        
+    def rel_altitude_callback(self, data):
+        self.altitude = float(data.data)
+        
+    def callback(self):
+        if self.latitude is None or self.longitude is None or self.altitude is None:
+            return
 
+        self.distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
+
+        if self.distance >= 100:
+            self.set_mode("GUIDED")
+            self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
+            self.correct_heading()
+    
+    def correct_heading(self):
+        while True:
+            self.distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
+            rospy.loginfo(f"Distance to target: {self.distance} meters")
+            
+            roll_error, pitch_error = self.calculate_errors()
+            current_time = rospy.get_time()
+            dt = current_time - self.prev_time
+            self.prev_time = current_time
+            
+            if 50 < self.distance <= 100:
+                self.perform_roll_correction(roll_error, dt)
+                rospy.loginfo(f"Roll error: {roll_error}")
+            if self.distance <= 50:
+                self.perform_pitch_correction(pitch_error, dt)
+                rospy.loginfo(f"Pitch error: {pitch_error}")
+                self.perform_dive_maneuver(0, pitch_error)
+                if self.qr_info or self.altitude <= 30:
+                    self.perform_climb_maneuver(-20)
+                    break
+            rospy.sleep(1)
+    
     def send_position_command(self, latitude, longitude, altitude):
         try:
             rospy.wait_for_service('/mavros/cmd/command_int')
@@ -181,12 +179,13 @@ class WaypointNode:
 
         current_roll = self.x
         target_roll = math.degrees(math.atan2(self.vector.y, self.vector.x))
+        # target_roll = ((target_roll +90) % 180) - 90
+        print(target_roll)
         roll_error = target_roll - current_roll
         roll_error = ((roll_error + 90) % 180) - 90
 
         current_pitch = self.y
-        distance_2d = math.sqrt((self.vector.x + self.vector.y)**2 + self.vector.z**2)
-        print(distance_2d)
+        distance_2d = math.sqrt((self.altitude)**2 + self.distance**2)
         target_pitch = math.degrees(math.atan2(self.vector.z, distance_2d))
         pitch_error = target_pitch - current_pitch
 
@@ -205,8 +204,9 @@ class WaypointNode:
 
 if __name__ == '__main__':
     try:
-        waypoint_node = WaypointNode()
-        waypoint_node.set_mode("GUIDED")
+        # Initialize node
+        rospy.init_node('autonom_node', anonymous=True)
+        autonom_node = AutonomNode()
         rospy.spin()
     except rospy.ROSInterruptException as e:
         rospy.logerr(f"ROS Interrupt: {e}")

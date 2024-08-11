@@ -15,8 +15,8 @@ class PosePublisherNode:
         self.home_pose = None
         
         # Constants
-        self.TARGET_LATITUDE = -35.360849
-        self.TARGET_LONGITUDE = 149.161835
+        self.TARGET_LATITUDE = 36.938828
+        self.TARGET_LONGITUDE = 35.532133
         self.TARGET_ALTITUDE = 0
 
         # Subscribers
@@ -38,7 +38,8 @@ class PosePublisherNode:
     def publish_vector(self):
         if self.uav_position is not None and self.home_pose is not None:
             try:
-                x, y, z = pm.geodetic2enu(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE, self.home_pose[0], self.home_pose[1], self.home_pose[2])
+                x, y, z = pm.geodetic2enu(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE, 
+                                          self.home_pose[0], self.home_pose[1], self.home_pose[2])
                 vector = Vector3()
                 vector.x = x
                 vector.y = y

@@ -28,26 +28,26 @@ def hss_coordinates():
         "hss_koordinat_bilgileri": [
             {
                 "id": 0,
-                "hssEnlem": -35.360947,
-                "hssBoylam": 149.164313,
+                "hssEnlem": 36.939879,
+                "hssBoylam": 35.532268,
                 "hssYaricap": 50
             },
             {
                 "id": 1,
-                "hssEnlem": -35.362358,
-                "hssBoylam": 149.167855,
+                "hssEnlem": 36.940047,
+                "hssBoylam": 35.537481,
                 "hssYaricap": 50
             },
             {
                 "id": 2,
-                "hssEnlem": -35.364373,
-                "hssBoylam": 149.163976,
+                "hssEnlem": 36.936330,
+                "hssBoylam": 35.531538,
                 "hssYaricap": 75
             },
             {
                 "id": 3,
-                "hssEnlem": -35.362722,
-                "hssBoylam": 149.160419,
+                "hssEnlem": 36.937116,
+                "hssBoylam": 35.537972,
                 "hssYaricap": 150
             }
         ]
@@ -56,8 +56,8 @@ def hss_coordinates():
 
 @app.route('/api/qr_koordinati', methods=['GET'])
 def get_qr_coordinates():
-    qr_latitude = -35.360849
-    qr_longtitude = 149.161835
+    qr_latitude   = 36.938828
+    qr_longtitude = 35.532133
     qr_coordinates = {
         "qrEnlem": qr_latitude,
         "qrBoylam": qr_longtitude

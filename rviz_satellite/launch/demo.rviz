@@ -7,6 +7,7 @@ Panels:
         - /TF1/Tree1
         - /Image2
         - /Image3
+        - /Marker1
       Splitter Ratio: 0.5
     Tree Height: 226
   - Class: rviz/Selection
@@ -134,10 +135,10 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /uav_to_target_vector
+      Marker Topic: /uav_to_target_marker
       Name: Marker
       Namespaces:
-        {}
+        vector: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -166,7 +167,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1038.55126953125
+      Distance: 805.9349365234375
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -174,17 +175,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 46.43266296386719
-        Y: 325.6479797363281
-        Z: 396.169189453125
+        X: -93.39143371582031
+        Y: 287.4298095703125
+        Z: -39.73699188232422
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7447970509529114
+      Pitch: 0.34979748725891113
       Target Frame: map
-      Yaw: 1.155401349067688
+      Yaw: 1.6203991174697876
     Saved: ~
 Window Geometry:
   Displays:
