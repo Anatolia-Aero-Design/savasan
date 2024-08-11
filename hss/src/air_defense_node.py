@@ -1,34 +1,65 @@
 #!/usr/bin/env python
 
 import rospy
-from mavros_msgs.srv import CommandInt
+from geometry_msgs.msg import PoseStamped
+from mavros_msgs.srv import CommandInt, SetMode
 from mavros_msgs.msg import CommandCode
 from std_srvs.srv import Empty, EmptyResponse
 import requests
+import numpy as np
 import logging
 from mavros_msgs.srv import WaypointPush
+import kamikaze.src.utilities as utils
 
 class Air_Defense_Node:
     def __init__(self) -> None:
+        self.uav_pose_sub = None
+        
+        self.uav_pose_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.uav_pose_callback)
         self.server_url_hss_koordinatlari = rospy.get_param('/comm_node/api/hss_koordinatlari')
         self.waypoint_push_srv = rospy.ServiceProxy('/mavros/mission/push', WaypointPush)
         self.command_int_srv = rospy.ServiceProxy('/mavros/cmd/command_int', CommandInt)
+        self.set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
         
-        self.parsed_list = {}
         self.geofence_list = []
         
         self.start_service = rospy.Service('enable_geo_fences', Empty, self.enable_geo_fences)
-        
+        self.stop_service = rospy.Service('disable_geo_fences', Empty, self.disable_geo_fences)
+    
+    def uav_pose_callback(self, data):
+        self.uav_position = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z])
+    
     def enable_geo_fences(self, req):
         try:
             self.parse_coordinates()
             self.send_geofences()
+            self.take_action_RTL()
             rospy.loginfo("Geofences enabled!")
             return EmptyResponse()
         except rospy.ServiceException as e:
             rospy.logerr(f"Service call failed: {e}")
             return EmptyResponse()
-    
+        
+    def disable_geo_fences(self, req):
+        try:    
+            self.send_command(CommandCode.DO_FENCE_ENABLE, 0)
+            self.geofence_list = []
+            rospy.loginfo("Geofences disabled!")
+            return EmptyResponse()
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Service call failed: {e}")
+            return EmptyResponse()
+        
+    def take_action_RTL(self):
+        distance_list = []
+        for i, item in enumerate(self.geofence_list):
+            distance = utils.haversine_formula(self.uav_position[0], self.uav_position[1], item[0], item[1])
+            distance -= item[2]
+            distance_list.append(distance)
+        for distance in distance_list:
+            if distance <= 0:
+                self.set_mode("RTL")
+            
     def get_coordinates(self):
         try:
             response = requests.get(self.server_url_hss_koordinatlari)
@@ -71,6 +102,7 @@ class Air_Defense_Node:
                 # Sending a circular exclusion zone
                 self.send_command(
                     CommandCode.NAV_FENCE_CIRCLE_EXCLUSION,
+                    i,
                     geofence["hssYaricap"],  # Radius
                     geofence["hssEnlem"],    # Latitude
                     geofence["hssBoylam"],   # Longitude
@@ -103,6 +135,17 @@ class Air_Defense_Node:
                 rospy.loginfo(f"Command {command} sent to plane successfully")
             else:
                 rospy.logwarn(f"Failed to send command {command}")
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Service call failed: {e}")
+
+    def set_mode(self, mode):
+        try:
+            rospy.wait_for_service('/mavros/set_mode', timeout=5)
+            response = self.set_mode_srv(custom_mode=mode)
+            if response.mode_sent:
+                rospy.loginfo(f"Mode set to {mode}")
+            else:
+                rospy.logwarn(f"Failed to set mode to {mode}")
         except rospy.ServiceException as e:
             rospy.logerr(f"Service call failed: {e}")
 
