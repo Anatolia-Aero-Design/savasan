@@ -1,39 +1,72 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from sensor_msgs.msg import NavSatFix
 from mavros_msgs.srv import CommandInt, SetMode
-from mavros_msgs.msg import CommandCode
+from mavros_msgs.msg import CommandCode, State
 from std_srvs.srv import Empty, EmptyResponse
+from std_msgs.msg import Float64
 import requests
-import numpy as np
 import logging
 from mavros_msgs.srv import WaypointPush
-import kamikaze.src.utilities as utils
+import math
+
+## Plane does not support NAV_FENCE_CIRCLE_EXCLUSION but when given fence list calculations are made correctly and RTL mode enabled 
 
 class Air_Defense_Node:
     def __init__(self) -> None:
+        # Initialize variables
         self.uav_pose_sub = None
+        self.latitude = None
+        self.longitude = None
+        self.altitude = None
+        self.state = None
+        self.heading = None
+        self.geofence_list = []
+        self.mission_file_path = "/home/valvarn/fence-items.txt"
         
-        self.uav_pose_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.uav_pose_callback)
+        # Set up subscribers
+        self.uav_pose_sub = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.uav_pose_callback)
+        self.rel_altitude_sub = rospy.Subscriber('/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
+        self.state_sub = rospy.Subscriber('/mavros/state', State, self.state_callback)
+        self.heading_sub = rospy.Subscriber('/mavros/global_position/compass_hdg', Float64, self.heading_callback)
+        
+        # Get server url from sim.launch
         self.server_url_hss_koordinatlari = rospy.get_param('/comm_node/api/hss_koordinatlari')
+        
+        # Set up service proxies        
         self.waypoint_push_srv = rospy.ServiceProxy('/mavros/mission/push', WaypointPush)
         self.command_int_srv = rospy.ServiceProxy('/mavros/cmd/command_int', CommandInt)
         self.set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
+        self.start_service = rospy.Service('enable_geofences', Empty, self.enable_geo_fences)
+        self.stop_service = rospy.Service('disable_geofences', Empty, self.disable_geo_fences)
         
-        self.geofence_list = []
-        
-        self.start_service = rospy.Service('enable_geo_fences', Empty, self.enable_geo_fences)
-        self.stop_service = rospy.Service('disable_geo_fences', Empty, self.disable_geo_fences)
+        # Create a timer to periodically perform tasks
+        self.timer = rospy.Timer(rospy.Duration(0.5), self.periodic_task)
     
+    def heading_callback(self, data):
+        self.heading = float(data.data)
+        
     def uav_pose_callback(self, data):
-        self.uav_position = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z])
+        self.latitude = float(data.latitude)
+        self.longitude = float(data.longitude)
     
+    def rel_altitude_callback(self, data):
+        self.altitude = float(data.data)
+        
+    def state_callback(self, msg):
+        self.state = msg.mode
+    
+    def periodic_task(self, event):
+        # Perform periodic tasks here, e.g., checking geofence status
+        self.take_action_GO_OPPOSITE_DIRECTION()
+        
     def enable_geo_fences(self, req):
         try:
             self.parse_coordinates()
+            self.write_mission_to_file()
             self.send_geofences()
-            self.take_action_RTL()
+            #self.take_action_RTL()
             rospy.loginfo("Geofences enabled!")
             return EmptyResponse()
         except rospy.ServiceException as e:
@@ -42,6 +75,9 @@ class Air_Defense_Node:
         
     def disable_geo_fences(self, req):
         try:    
+            # Clear the fence-items.txt file
+            with open(self.mission_file_path, 'w') as file:
+                pass  # Open in write mode and close immediately to clear the file
             self.send_command(CommandCode.DO_FENCE_ENABLE, 0)
             self.geofence_list = []
             rospy.loginfo("Geofences disabled!")
@@ -52,14 +88,26 @@ class Air_Defense_Node:
         
     def take_action_RTL(self):
         distance_list = []
-        for i, item in enumerate(self.geofence_list):
-            distance = utils.haversine_formula(self.uav_position[0], self.uav_position[1], item[0], item[1])
-            distance -= item[2]
+        for item in self.geofence_list:
+            distance = self.haversine_formula(self.latitude, self.longitude, item["hssEnlem"], item["hssBoylam"])
+            distance -= item["hssYaricap"]
             distance_list.append(distance)
         for distance in distance_list:
-            if distance <= 0:
+            if distance <= 0 and self.state != 'RTL':
                 self.set_mode("RTL")
-            
+                self.response = True
+    
+    def take_action_GO_OPPOSITE_DIRECTION(self):
+        distance_list = []
+        for item in self.geofence_list:
+            distance = self.haversine_formula(self.latitude, self.longitude, item["hssEnlem"], item["hssBoylam"])
+            distance -= item["hssYaricap"]
+            distance_list.append(distance)
+        for distance in distance_list:
+            if distance <= 0 and self.state != 'RTL':
+                latitude_dest, longitude_dest = self.calculate_waypoint(self.latitude, self.longitude, 100, self.heading) 
+                self.send_command(CommandCode.DO_REPOSITION, 0, 0, 0, 0, latitude_dest, longitude_dest, self.altitude)
+        
     def get_coordinates(self):
         try:
             response = requests.get(self.server_url_hss_koordinatlari)
@@ -92,6 +140,25 @@ class Air_Defense_Node:
             })
         return self.geofence_list
 
+    def create_fence_mission(self):
+        mission_data = "QGC WPL 110\n"
+        
+        # Add each fence as a line in the mission file
+        for i, fence in enumerate(self.geofence_list):
+            line = f"{i}\t0\t0\t5004\t{fence['hssYaricap']}\t0\t0\t0\t{fence['hssEnlem']}\t{fence['hssBoylam']}\t0\t1"
+            mission_data += line + "\n"
+        
+        return mission_data
+
+    def write_mission_to_file(self):
+        data = self.create_fence_mission()
+        try:
+            with open(self.mission_file_path, 'w') as file:
+                file.write(data)
+            rospy.loginfo(f"Mission file written successfully to {self.mission_file_path}")
+        except Exception as e:
+            rospy.logerr(f"Failed to write mission file: {e}")
+
     def send_geofences(self):
         try:    
             # Enable geofence system
@@ -106,8 +173,7 @@ class Air_Defense_Node:
                     geofence["hssYaricap"],  # Radius
                     geofence["hssEnlem"],    # Latitude
                     geofence["hssBoylam"],   # Longitude
-                    0, 0, 0, 0, 
-                )
+                    0, 0, 0)
             
             # Complete the geofence definition
             self.send_command(CommandCode.DO_FENCE_ENABLE, 0)
@@ -122,14 +188,14 @@ class Air_Defense_Node:
                 frame=3,
                 command=command,
                 current=0,
-                autocontinue=False, 
-                param1=param1,
-                param2=param2,
-                param3=param3,
-                param4=param4,
-                x=x,
-                y=y,
-                z=z
+                autocontinue=0,  # Convert False to 0 (unsigned integer)
+                param1=int(param1),
+                param2=int(param2),
+                param3=int(param3),
+                param4=int(param4),
+                x=int(x),
+                y=int(y),
+                z=int(z)
             )
             if response.success:
                 rospy.loginfo(f"Command {command} sent to plane successfully")
@@ -148,6 +214,63 @@ class Air_Defense_Node:
                 rospy.logwarn(f"Failed to set mode to {mode}")
         except rospy.ServiceException as e:
             rospy.logerr(f"Service call failed: {e}")
+
+    def haversine_formula(self, latitude_1, longitude_1, latitude_2, longitude_2):
+        """
+        Calculate the great-circle distance between two points on the Earth's surface.
+        """
+        latitude_1_rad = math.radians(latitude_1)
+        latitude_2_rad = math.radians(latitude_2)
+        
+        longitude_1_rad = math.radians(longitude_1)
+        longitude_2_rad = math.radians(longitude_2)
+        
+        lat_difference = abs(latitude_1_rad - latitude_2_rad)
+        lon_difference = abs(longitude_1_rad - longitude_2_rad)
+        
+        a = (math.sin(lat_difference / 2)) ** 2 + (math.cos(latitude_1_rad) * math.cos(latitude_2_rad) * (math.sin(lon_difference / 2)) ** 2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = 6371000 * c
+        return distance
+    
+    
+    def calculate_waypoint(self, latitude, longitude, distance, bearing):
+        """
+        Calculate a new waypoint given a starting coordinate, distance, and bearing.
+        Adjust the bearing to point in the opposite direction (180 degrees opposite).
+        This is applicable to any latitude/longitude including the northern hemisphere.
+        """
+        # Convert latitude, longitude, and bearing to radians
+        latitude_rad = math.radians(latitude)
+        longitude_rad = math.radians(longitude)
+        bearing_rad = math.radians((bearing + 180) % 360)  # Adjust to 180 degrees opposite
+
+        # Earth's radius in meters
+        R = 6371000
+
+        # Calculate the destination latitude
+        latitude_dest_rad = math.asin(
+            math.sin(latitude_rad) * math.cos(distance / R) +
+            math.cos(latitude_rad) * math.sin(distance / R) * math.cos(bearing_rad)
+        )
+
+        # Calculate the destination longitude
+        longitude_dest_rad = longitude_rad + math.atan2(
+            math.sin(bearing_rad) * math.sin(distance / R) * math.cos(latitude_rad),
+            math.cos(distance / R) - math.sin(latitude_rad) * math.sin(latitude_dest_rad)
+        )
+
+        # Convert the latitude and longitude from radians to degrees
+        latitude_dest = math.degrees(latitude_dest_rad)
+        longitude_dest = math.degrees(longitude_dest_rad)
+
+        # Handle longitude wrapping
+        if longitude_dest < -180:
+            longitude_dest += 360
+        elif longitude_dest > 180:
+            longitude_dest -= 360
+
+        return latitude_dest, longitude_dest
 
 if __name__ == '__main__':
     try:
