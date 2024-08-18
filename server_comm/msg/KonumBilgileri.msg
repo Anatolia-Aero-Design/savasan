@@ -1,1 +1,0 @@
-KonumBilgisi[] konumBilgileri
