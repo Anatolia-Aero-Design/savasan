@@ -59,14 +59,13 @@ class Air_Defense_Node:
     
     def periodic_task(self, event):
         # Perform periodic tasks here, e.g., checking geofence status
-        self.take_action_GO_OPPOSITE_DIRECTION()
+        self.take_action_RTL()
         
     def enable_geo_fences(self, req):
         try:
             self.parse_coordinates()
             self.write_mission_to_file()
-            self.send_geofences()
-            #self.take_action_RTL()
+            self.send_command(CommandCode.DO_FENCE_ENABLE, 1)
             rospy.loginfo("Geofences enabled!")
             return EmptyResponse()
         except rospy.ServiceException as e:
@@ -96,17 +95,6 @@ class Air_Defense_Node:
             if distance <= 0 and self.state != 'RTL':
                 self.set_mode("RTL")
                 self.response = True
-    
-    def take_action_GO_OPPOSITE_DIRECTION(self):
-        distance_list = []
-        for item in self.geofence_list:
-            distance = self.haversine_formula(self.latitude, self.longitude, item["hssEnlem"], item["hssBoylam"])
-            distance -= item["hssYaricap"]
-            distance_list.append(distance)
-        for distance in distance_list:
-            if distance <= 0 and self.state != 'RTL':
-                latitude_dest, longitude_dest = self.calculate_waypoint(self.latitude, self.longitude, 100, self.heading) 
-                self.send_command(CommandCode.DO_REPOSITION, 0, 0, 0, 0, latitude_dest, longitude_dest, self.altitude)
         
     def get_coordinates(self):
         try:
@@ -180,7 +168,7 @@ class Air_Defense_Node:
         except Exception as e:
             rospy.logerr(f"Unexpected error occurred: {e}")
     
-    def send_command(self, command, param1, param2=2, param3=0, param4=0, x=0, y=0, z=0):
+    def send_command(self, command, param1, param2=0, param3=0, param4=0, x=0, y=0, z=0):
         try:
             rospy.wait_for_service('/mavros/cmd/command_int')
             response = self.command_int_srv(
@@ -232,45 +220,6 @@ class Air_Defense_Node:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         distance = 6371000 * c
         return distance
-    
-    
-    def calculate_waypoint(self, latitude, longitude, distance, bearing):
-        """
-        Calculate a new waypoint given a starting coordinate, distance, and bearing.
-        Adjust the bearing to point in the opposite direction (180 degrees opposite).
-        This is applicable to any latitude/longitude including the northern hemisphere.
-        """
-        # Convert latitude, longitude, and bearing to radians
-        latitude_rad = math.radians(latitude)
-        longitude_rad = math.radians(longitude)
-        bearing_rad = math.radians((bearing + 180) % 360)  # Adjust to 180 degrees opposite
-
-        # Earth's radius in meters
-        R = 6371000
-
-        # Calculate the destination latitude
-        latitude_dest_rad = math.asin(
-            math.sin(latitude_rad) * math.cos(distance / R) +
-            math.cos(latitude_rad) * math.sin(distance / R) * math.cos(bearing_rad)
-        )
-
-        # Calculate the destination longitude
-        longitude_dest_rad = longitude_rad + math.atan2(
-            math.sin(bearing_rad) * math.sin(distance / R) * math.cos(latitude_rad),
-            math.cos(distance / R) - math.sin(latitude_rad) * math.sin(latitude_dest_rad)
-        )
-
-        # Convert the latitude and longitude from radians to degrees
-        latitude_dest = math.degrees(latitude_dest_rad)
-        longitude_dest = math.degrees(longitude_dest_rad)
-
-        # Handle longitude wrapping
-        if longitude_dest < -180:
-            longitude_dest += 360
-        elif longitude_dest > 180:
-            longitude_dest -= 360
-
-        return latitude_dest, longitude_dest
 
 if __name__ == '__main__':
     try:

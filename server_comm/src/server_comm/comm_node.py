@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 import rospy
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix
 from std_msgs.msg import Float64, Bool, String
@@ -11,6 +12,7 @@ from server_comm.msg import KonumBilgileri, KonumBilgisi
 from utils import quaternion_to_euler, calculate_speed
 from datetime import datetime
 import time
+import threading
 from image_processor.msg import Yolo_xywh
 
 class Comm_Node:
@@ -20,7 +22,7 @@ class Comm_Node:
         self.server_url_telemetri_gonder = rospy.get_param('/comm_node/api/telemetri_gonder')
         self.server_url_kilitlenme_bilgisi = rospy.get_param('/comm_node/api/kilitlenme_bilgisi')
         self.server_url_sunucusaati = rospy.get_param('/comm_node/api/sunucusaati')
-        self.server_url_qr_koordinati = rospy.get_param('/comm_node/api/qr_koordinati')
+        self.server_url_kamikaze_bilgisi = rospy.get_param('/comm_node/api/kamikaze_bilgisi')
 
         self.imu = None
         self.battery = None
@@ -30,6 +32,7 @@ class Comm_Node:
         self.state = None
         self.lock_on = None
         self.kilit = None
+        self.qr_data = None
         
         self.TARGET_LATITUDE = None
         self.TARGET_LONGITUDE = None
@@ -55,6 +58,7 @@ class Comm_Node:
             self.lock_on_sub = rospy.Subscriber('/lock_on_status', Bool, self.lock_on_callback)
             self.kilit_sub = rospy.Subscriber('/kilit', Bool, self.kilit_callback)
             self.bbox_sub = rospy.Subscriber("/yolov8/xywh", Yolo_xywh, self.bbox_callback)
+            self.qr_sub = rospy.Subscriber("/qr_code_data", String, self.qr_callback)
         
         except Exception as e:
             print("error")
@@ -93,14 +97,23 @@ class Comm_Node:
     def state_callback(self, msg):
         self.state = msg
         self.process_data()
+        
+    def qr_callback(self,msg):
+        self.qr_data = msg.data
+        self.publish_qr()
 
     def lock_on_callback(self, msg):
         self.lock_on = msg
         self.process_data()
 
     def kilit_callback(self, msg):
-        self.kilit = msg
+        self.kilit = msg.data
+        rospy.loginfo(f"Received kilit: {msg.data}")
+        logging.info(f"Received kilit: {msg.data}")
         self.process_data()
+
+        self.lock_on_thread = threading.Thread(target=self.send_lock_on_info)
+        self.lock_on_thread.start()
 
     def bbox_callback(self, msg):
         self.bbox = msg
@@ -198,16 +211,12 @@ class Comm_Node:
         while True:
             if kilit_msg is None and self.kilit_prev is None:
                 pass
-
             elif self.kilit_prev is None and kilit_msg is not None:
                 self.kilit_prev = kilit_msg
-
             elif self.kilit_prev is True and kilit_msg is True or self.kilit_prev is False and kilit_msg is True:
                 self.start_time = self.get_current_time()
-
             elif self.kilit_prev is True and kilit_msg is False and lock_on_msg is True:
                 self.end_time = self.get_current_time()
-
                 if lock_on_msg:
                     try:
                         data_dict = {
@@ -225,18 +234,50 @@ class Comm_Node:
                             },
                             "otonom_kilitlenme": 1
                         }
-                        print(data_dict)
                         response = requests.post(self.server_url_kilitlenme_bilgisi, json=data_dict)
                         if response.status_code == 200:
                             logging.info(f"Lock-on data sent successfully: {response.json()}")
                         else:
                             logging.error(f"Failed to send lock-on data, status code: {response.status_code}")
-
                     except Exception as e:
                         logging.error(f"An error occurred while sending lock-on data: {str(e)}")
-
             self.kilit_prev = kilit_msg  # Update previous status
             time.sleep(0.1)
+
+    def publish_qr(self):
+        #if self.qr_data:
+                try:
+                    start_time = rospy.get_param('/kamikazeBaslangicZamani', [0, 0, 0, 0])
+                    end_time = rospy.get_param('/kamikazeBitisZaman', [0, 0, 0, 0])
+                    rospy.loginfo(f"Start Time Retrieved: {start_time}")
+                    rospy.loginfo(f"End Time Retrieved: {end_time}")
+                    data_dict = {
+                        "kamikazeBaslangicZamani": {
+                            "hour": start_time[0],
+                            "minute": start_time[1],
+                            "second": start_time[2],
+                            "millisecond": start_time[3]
+                        },
+                        "kamikazeBitisZaman": {
+                            "hour": end_time[0],
+                            "minute": end_time[1],
+                            "second": end_time[2],
+                            "millisecond": end_time[3]
+                        },
+                        "qrMetni ": self.qr_data if self.qr_data else "No QR Data" 
+                    }
+                    print("Correction Timing Dictionary:")
+                    print(json.dumps(data_dict, indent=4))
+                    # Here you could send the data, save it to a file, etc.
+                    response = requests.post(self.server_url_qr_bilgisi, json=data_dict)
+                    if response.status_code == 200:
+                        logging.info(f"Lock-on data sent successfully: {response.json()}")
+                    else:
+                        logging.error(f"Failed to send lock-on data, status code: {response.status_code}")
+                except KeyError:
+                    rospy.logerr("Failed to retrieve start or end time from ROS parameters.")
+        #else:
+        #       rospy.logerr("no qr_data available")
 
     def get_server_time(self):
         try:
@@ -254,7 +295,6 @@ class Comm_Node:
             logging.error(f"An error occurred while retrieving server time: {str(e)}")
             return None
         
-
 if __name__ == '__main__':
     rospy.init_node('comm_node', anonymous=True)
     comm_node = Comm_Node()
