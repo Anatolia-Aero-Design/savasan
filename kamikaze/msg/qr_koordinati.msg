@@ -1,0 +1,2 @@
+float64 qrEnlem
+float64 qrBoylam
