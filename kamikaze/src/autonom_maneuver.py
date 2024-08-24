@@ -185,7 +185,7 @@ class Autonom_Maneuver_Node:
 
     def start_waypoint(self, req):
         
-        self.qr_reader = QRReader()
+        self.qr_reader = QR_Node()
         if self.home_pose is None:
             rospy.logwarn("Home pose not available yet.")
             return EmptyResponse()
