@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 
 import json
+from queue import Empty
+from flask import session
 import rospy
-from sensor_msgs.msg import Imu, BatteryState, NavSatFix
+from sensor_msgs.msg import Imu, BatteryState, NavSatFix, TimeReference
 from std_msgs.msg import Float64, Bool, String
 from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
 import requests
 import logging
 from server_comm.msg import KonumBilgileri, KonumBilgisi
-from utils import quaternion_to_euler, calculate_speed
+from utils import quaternion_to_euler, calculate_speed, unix_to_utc_formatted
 from datetime import datetime
 import time
 import threading
@@ -17,6 +19,11 @@ from image_processor.msg import Yolo_xywh
 
 class Comm_Node:
     def __init__(self):
+        self.session = requests.Session()
+        self.base_url = 'http://savasaniha.baykartech.com/api'
+        self.username = 'estuanatolia'
+        self.password = '2Eqtm3v3ZJ'
+        self.team_number = None
         
         # Get server APIs from sim.launch params
         self.server_url_telemetri_gonder = rospy.get_param('/comm_node/api/telemetri_gonder')
@@ -33,6 +40,8 @@ class Comm_Node:
         self.lock_on = None
         self.kilit = None
         self.qr_data = None
+        self.fcu_time = None
+        self.fcu_time_nsecs = None
         
         self.TARGET_LATITUDE = None
         self.TARGET_LONGITUDE = None
@@ -59,6 +68,7 @@ class Comm_Node:
             self.kilit_sub = rospy.Subscriber('/kilit', Bool, self.kilit_callback)
             self.bbox_sub = rospy.Subscriber("/yolov8/xywh", Yolo_xywh, self.bbox_callback)
             self.qr_sub = rospy.Subscriber("/qr_code_data", String, self.qr_callback)
+            self.fcu_time_sub = rospy.Subscriber("/mavros/time_reference", TimeReference, self.fcu_time_callback)
         
         except Exception as e:
             print("error")
@@ -70,10 +80,15 @@ class Comm_Node:
         # Initialize Publishers
         self.server_time_pub = rospy.Publisher('/server_time', String, queue_size=10)
         self.konum_pub = rospy.Publisher('/konum_bilgileri', KonumBilgileri, queue_size=10)
-
+        
         # Configure logging
         logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    
+    def fcu_time_callback(self, msg):
+        self.fcu_time = msg.time_ref.secs
+        self.fcu_time_nsecs = msg.time_ref.nsecs
         
+    
     def imu_callback(self, msg):
         self.imu = msg
         self.process_data()
@@ -112,7 +127,7 @@ class Comm_Node:
         logging.info(f"Received kilit: {msg.data}")
         self.process_data()
 
-        self.lock_on_thread = threading.Thread(target=self.send_lock_on_info)
+        self.lock_on_thread = threading.Thread(target=self.send_lock_on_info(self.kilit, self.lock_on))
         self.lock_on_thread.start()
 
     def bbox_callback(self, msg):
@@ -124,10 +139,30 @@ class Comm_Node:
         rospy.loginfo(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
         self.process_data()
 
+    def login(self):
+        url = f"{self.base_url}/giris"
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+        data = {
+            "kadi": self.username,
+            "sifre": self.password
+        }
+        response = self.session.post(url, json=data, headers=headers, timeout=10)
+        if response.status_code == 200:
+            print("Login successful!")
+            print(response.json())
+            self.team_number = response.json()
+        else:
+            print(f"Failed to login. Status code: {response.status_code}")
+            print("Response:", response.text)
+        return response
+    
     def process_data(self):
         if not (self.imu and self.battery and self.rel_alt and self.position and self.speed and self.state):
             return
-            
+
         if self.state.mode == 'AUTO' or self.state.mode.startswith('GUIDED'):
             IHA_otonom = 1  # Set to 1 for autonomous modes
         else:
@@ -144,7 +179,7 @@ class Comm_Node:
 
             # Prepare data dictionary
             data_dict = {
-                "takim_numarasi": 31,
+                "takim_numarasi": self.team_number,
                 "IHA_enlem": self.position.latitude,
                 "IHA_boylam": self.position.longitude,
                 "IHA_irtifa": self.rel_alt.data,
@@ -159,12 +194,12 @@ class Comm_Node:
                 "hedef_merkez_Y": self.bbox_y,
                 "hedef_genislik": self.bbox_w,
                 "hedef_yukseklik": self.bbox_h,
-                "gps_saati": None # TODO gps time taken from fcu will be written here 
+                "gps_saati": unix_to_utc_formatted(self.fcu_time, self.fcu_time_nsecs)
             }
             logging.info("Prepared data dictionary for server update.")
 
             # Send data to the server
-            response = requests.post(self.server_url_telemetri_gonder, json=data_dict)
+            response = self.session.post(self.server_url_telemetri_gonder, json=data_dict)
             logging.info(f"Sent data to server: {data_dict}")
 
             # Check server response
@@ -234,7 +269,7 @@ class Comm_Node:
                             },
                             "otonom_kilitlenme": 1
                         }
-                        response = requests.post(self.server_url_kilitlenme_bilgisi, json=data_dict)
+                        response = self.session.post(self.server_url_kilitlenme_bilgisi, json=data_dict)
                         if response.status_code == 200:
                             logging.info(f"Lock-on data sent successfully: {response.json()}")
                         else:
@@ -269,7 +304,7 @@ class Comm_Node:
                     print("Correction Timing Dictionary:")
                     print(json.dumps(data_dict, indent=4))
                     # Here you could send the data, save it to a file, etc.
-                    response = requests.post(self.server_url_qr_bilgisi, json=data_dict)
+                    response = self.session.post(self.server_url_qr_bilgisi, json=data_dict)
                     if response.status_code == 200:
                         logging.info(f"Lock-on data sent successfully: {response.json()}")
                     else:
@@ -281,12 +316,13 @@ class Comm_Node:
 
     def get_server_time(self):
         try:
-            response = requests.get(self.server_url_sunucusaati)
+            response = self.session.get(self.server_url_sunucusaati, timeout=10)
             if response.status_code == 200:
-                server_time = response.json().get('sunucusaati')
+                server_time = response.json()
                 logging.info(f"Server time retrieved successfully: {server_time}")
-                time_str = f"{server_time['gun']}.{server_time['saat']}.{server_time['dakika']}.{server_time['saniye']}.{server_time['milisaniye']}"
+                time_str = f"{server_time['gun']}:{server_time['saat']}:{server_time['dakika']}:{server_time['saniye']}:{server_time['milisaniye']}"
                 self.server_time_pub.publish(time_str)
+                print(time_str)
                 return time_str
             else:
                 logging.error(f"Failed to retrieve server time, status code: {response.status_code}")
@@ -296,8 +332,9 @@ class Comm_Node:
             return None
         
 if __name__ == '__main__':
-    rospy.init_node('comm_node', anonymous=True)
+    rospy.init_node('comm_node', anonymous=True)    
     comm_node = Comm_Node()
+    comm_node.login() # perform login
     try:
         rospy.spin()
     except rospy.ROSInterruptException:

@@ -22,12 +22,12 @@
 
     <!-- server_comm Node Configuration -->
     <node name="comm_node" pkg="server_comm" type="comm_node.py" output="screen">
-        <param name="/api/telemetri_gonder"   value="http://10.42.0.1:5000/api/telemetri_gonder" /> <!-- Update it according to your server IP -->
-        <param name="/api/kilitlenme_bilgisi" value="http://10.42.0.1:5000/api/kilitlenme_bilgisi" />
-        <param name="/api/sunucusaati"        value="http://10.42.0.1:5000/api/sunucusaati" />
-        <param name="/api/qr_koordinati"      value="http://10.42.0.1:5000/api/qr_koordinati" />
-        <param name="/api/kamikaze_bilgisi"   value="http://10.42.0.1:5000/api/kamikaze_bilgisi" />
-        <param name="/api/hss_koordinatlari"  value="http://10.42.0.1:5000/api/hss_koordinatlari" />
+        <param name="/api/telemetri_gonder"   value="http://savasaniha.baykartech.com/api/telemetri_gonder" /> <!-- Update it according to your server IP -->
+        <param name="/api/kilitlenme_bilgisi" value="http://savasaniha.baykartech.com/api/kilitlenme_bilgisi" />
+        <param name="/api/sunucusaati"        value="http://savasaniha.baykartech.com/api/sunucusaati" />
+        <param name="/api/qr_koordinati"      value="http://savasaniha.baykartech.com/api/qr_koordinati" />
+        <param name="/api/kamikaze_bilgisi"   value="http://savasaniha.baykartech.com/api/kamikaze_bilgisi" />
+        <param name="/api/hss_koordinatlari"  value="http://savasaniha.baykartech.com/api/hss_koordinatlari" />
     </node>
  
     <node name="camera_publisher"      pkg="image_handler"     type="camera_publisher.py"      output="screen"/>

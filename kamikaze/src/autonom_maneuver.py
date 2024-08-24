@@ -4,8 +4,8 @@ from numpy import NaN
 import numpy as np
 import math
 import rospy
-from mavros_msgs.msg import AttitudeTarget,HomePosition
-from mavros_msgs.srv import WaypointClear, SetMode,CommandInt
+from mavros_msgs.msg import AttitudeTarget, HomePosition
+from mavros_msgs.srv import WaypointClear, SetMode, CommandInt
 from std_srvs.srv import Empty, EmptyResponse
 from sensor_msgs.msg import NavSatFix
 from std_msgs.msg import Float64

@@ -8,7 +8,6 @@ import cv2
 import message_filters
 import time
 from std_msgs.msg import Int32, Bool, String
-import json
 
 class ImageProcessorNode:
 

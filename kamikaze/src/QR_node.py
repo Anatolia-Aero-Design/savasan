@@ -8,7 +8,6 @@ from std_msgs.msg import String
 import utilities as utils
 from pyzbar.pyzbar import decode
 
-
 class QR_Node:
     def __init__(self) -> None:
         self.bridge = CvBridge()    
