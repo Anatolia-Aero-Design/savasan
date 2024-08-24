@@ -20,8 +20,7 @@ def unix_to_utc_formatted(unix_time, nsecs):
     
     # Format the UTC time to include day, hour, minute, second, and milliseconds
     formatted_time = utc_time.strftime("%d:%H:%M:%S.%f")[:-3]
-    formatted_time = {"gün": utc_time.strftime("%d"), 
-                      "saat": int(utc_time.strftime("%H"))+3,
+    formatted_time = {"saat": int(utc_time.strftime("%H"))+3,
                       "dakika": utc_time.strftime("%M"),
                       "saniye": utc_time.strftime("%S"),
                       "milisaniye": nsecs}

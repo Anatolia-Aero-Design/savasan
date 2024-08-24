@@ -170,5 +170,3 @@ def reduce_glare(image):
     # Apply Gaussian Blur and thresholding to reduce glare
     blurred = cv2.GaussianBlur(image, (5, 5), 0)
     return cv2.threshold(blurred, 200, 255, cv2.THRESH_BINARY)[1]
-
-
