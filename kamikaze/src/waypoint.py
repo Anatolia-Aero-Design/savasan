@@ -175,9 +175,9 @@ class WaypointNode:
                 rospy.loginfo("QR code not detected.")
             
             if distance <= 150 and self.altitude > 50:
-                rospy.loginfo(f"PİTCH: {-self.y}")
+                rospy.loginfo(f"PITCH: {-self.y}")
                 rospy.loginfo(f"ROLL: {self.x}")
-                rospy.loginfo(f"DİSTANCE: {distance}")
+                rospy.loginfo(f"DISTANCE: {distance}")
                 if self.qr_start_initialized is False:
                     self.start_time = self.get_current_time()
                     rospy.set_param('/kamikazeBaslangicZamani', self.start_time)
@@ -187,7 +187,7 @@ class WaypointNode:
             
                 rospy.loginfo(f"Roll error: {roll_error}")
                 rospy.loginfo(f"pitch error: {pitch_error}")
-                rospy.loginfo(f"ALTİTUDE: {self.altitude}")
+                rospy.loginfo(f"ALTITUDE: {self.altitude}")
             #elif distance <= 50 and self.altitude > 40:
             #   self.perform_dive_maneuver(roll_error, -35, dt,distance)
                 
@@ -294,19 +294,15 @@ class WaypointNode:
         
         
        # self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, 0.0)
-       
-        MAX_ROLL = math.radians(30)  
-        MAX_PITCH = math.radians(30)  
+        
 
-        roll_correction = self.roll_pid.compute(roll_error, dt)*0.01
-        pitch_correction = (self.pitch_pid.compute(pitch_error, dt))*4
+        roll_correction = self.roll_pid.compute(roll_error, dt)
+        pitch_correction = (self.pitch_pid.compute(pitch_error, dt))
 
         pitch = -(math.radians(pitch_correction))
         roll = math.radians(roll_correction)
         
-        roll = max(min(roll, MAX_ROLL), -MAX_ROLL)
-        pitch = max(min(pitch, MAX_PITCH), -MAX_PITCH)
-        self.attitude_controller.set_attitude(roll_correction, pitch-0.01, 0, 0.5)
+        self.attitude_controller.set_attitude(roll_correction, pitch, 0, 0)
         rospy.loginfo(f"roll correction: {roll_correction},")
         rospy.loginfo(f"pitch correction: {pitch},")
         return roll
@@ -324,17 +320,17 @@ class WaypointNode:
             rospy.logerr(f"Failed to clear waypoints: {e}")
             return
         
-        rospy.loginfo(f"Performing DİVE")
+        rospy.loginfo(f"Performing DIVE")
         roll_correction = self.roll_pid.compute(roll_error, dt)
         roll = (math.radians(roll_correction))/10
         self.attitude_controller.set_attitude(roll-0.6, pitch, 0, 0.5)
         #rospy.loginfo(f"pitch correction: {pitch}")
         rospy.loginfo(f"roll correction: {roll-0.6}")
 
-        rospy.loginfo(f"DİSTANCE: {distance}")
-        rospy.loginfo(f"ALTİTUDE: {self.altitude}")
+        rospy.loginfo(f"DISTANCE: {distance}")
+        rospy.loginfo(f"ALTITUDE: {self.altitude}")
         rospy.loginfo(f"ROLL: {self.x},")
-        rospy.loginfo(f"PİTCH {self.y}")  """
+        rospy.loginfo(f"PITCH {self.y}")  """
 
     
     def perform_climb_maneuver(self):
