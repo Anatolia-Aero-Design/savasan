@@ -46,7 +46,7 @@ def euler_to_quaternion(roll, pitch, yaw):
     """
     Convert Euler angles to a quaternion.
     """
-    quaternion = tf_trans.quaternion_from_euler(roll, pitch, yaw)
+    quaternion = tf_trans.quaternion_from_euler(math.radians(roll), math.radians(pitch), math.radians(yaw))
     return Quaternion(*quaternion)
 
 def quaternion_to_euler(x, y, z, w):
@@ -67,36 +67,74 @@ def quaternion_to_euler_degrees(quaternion):
     return euler_angles_deg
 
 
-def calculate_waypoint_sequence(target_lat, target_lon, target_alt, home_alt,
-                                angle_degrees, distance1, distance2, distance3):
+def calculate_waypoint_sequence(current_lat, current_lon, current_alt, target_lat, target_lon, 
+                                target_alt, azimuth_angle, distance_1_2, dive_angle, distance_leave):
     """
-    Calculate waypoints around a target coordinate at specified distances and angles.
+    Generate waypoints based on the given target location, azimuth angle, and distances for a dive maneuver.
+
+    Args:
+    - current_lat (float): Current latitude of the plane (waypoint 2).
+    - current_lon (float): Current longitude of the plane (waypoint 2).
+    - current_alt (float): Current altitude of the plane (waypoint 2).
+    - target_lat (float): Latitude of the target location (waypoint 3).
+    - target_lon (float): Longitude of the target location (waypoint 3).
+    - target_alt (float): Altitude of the target location (waypoint 3).
+    - azimuth_angle (float): Azimuth angle in degrees (0-360) from the North.
+    - distance_1_2 (float): Distance between waypoint 1 and waypoint 2 (in meters).
+    - dive_angle (float): Dive angle in degrees (between waypoint 2 and waypoint 3).
+    - distance_leave (float): Distance between waypoint 3 and waypoint 4 (in meters).
+    
+    Returns:
+    - list of dicts: A list of waypoints with their latitude, longitude, and altitude.
     """
-    target_lat_rad = math.radians(target_lat)
-    target_lon_rad = math.radians(target_lon)
+    
+    # Convert angles from degrees to radians
+    azimuth_rad = math.radians(azimuth_angle)
+    dive_rad = math.radians(dive_angle)
 
-    # Calculate the waypoints
-    wp1_lat_rad = math.asin(math.sin(target_lat_rad) * math.cos((2 * distance1) / EARTH_RADIUS) +
-                            math.cos(target_lat_rad) * math.sin((2 * distance1) / EARTH_RADIUS) * math.cos(math.radians(angle_degrees)))
-    wp1_lon_rad = target_lon_rad + math.atan2(math.sin(math.radians(angle_degrees)) * math.sin((2 * distance1) / EARTH_RADIUS) * math.cos(target_lat_rad),
-                            math.cos((2 * distance1) / EARTH_RADIUS) - math.sin(target_lat_rad) * math.sin(wp1_lat_rad))
+    # Calculate the change in latitude/longitude for distance 1 -> 2
+    delta_lat_1_2 = (distance_1_2 / EARTH_RADIUS) * math.cos(azimuth_rad)
+    delta_lon_1_2 = (distance_1_2 / (EARTH_RADIUS * math.cos(math.radians(current_lat)))) * math.sin(azimuth_rad)
 
-    wp2_lat_rad = math.asin(math.sin(target_lat_rad) * math.cos(distance2 / EARTH_RADIUS) +
-                            math.cos(target_lat_rad) * math.sin(distance2 / EARTH_RADIUS) * math.cos(math.radians(angle_degrees)))
-    wp2_lon_rad = target_lon_rad + math.atan2(math.sin(math.radians(angle_degrees)) * math.sin(distance2 / EARTH_RADIUS) * math.cos(target_lat_rad),
-                            math.cos(distance2 / EARTH_RADIUS) - math.sin(target_lat_rad) * math.sin(wp2_lat_rad))
+    # Waypoint 1: Starting point (before the dive)
+    waypoint_1_lat = current_lat - math.degrees(delta_lat_1_2)
+    waypoint_1_lon = current_lon - math.degrees(delta_lon_1_2)
+    waypoint_1_alt = current_alt  # Altitude remains the same as the plane's current altitude
 
-    wp4_lat_rad = math.asin(math.sin(target_lat_rad) * math.cos(distance3 / EARTH_RADIUS) +
-                            math.cos(target_lat_rad) * math.sin(distance3 / EARTH_RADIUS) * math.cos(math.radians(angle_degrees + 180)))
-    wp4_lon_rad = target_lon_rad + math.atan2(math.cos(math.radians(angle_degrees + 90)) * math.sin(distance3 / EARTH_RADIUS) * math.cos(target_lat_rad),
-                            math.cos(distance3 / EARTH_RADIUS) - math.sin(target_lat_rad) * math.sin(wp4_lat_rad))
+    # Calculate the distance between waypoint 2 and 3 based on the dive angle
+    distance_2_3 = (current_alt - target_alt) / math.tan(dive_rad)
 
-    return [
-        (math.degrees(wp1_lat_rad), math.degrees(wp1_lon_rad), home_alt),
-        (math.degrees(wp2_lat_rad), math.degrees(wp2_lon_rad), home_alt),
-        (target_lat, target_lon, target_alt),
-        (math.degrees(wp4_lat_rad), math.degrees(wp4_lon_rad), home_alt)
+    # Calculate the change in latitude/longitude for distance 2 -> 3
+    delta_lat_2_3 = (distance_2_3 / EARTH_RADIUS) * math.cos(azimuth_rad)
+    delta_lon_2_3 = (distance_2_3 / (EARTH_RADIUS * math.cos(math.radians(target_lat)))) * math.sin(azimuth_rad)
+
+    # Waypoint 2: The point before the dive with the current altitude
+    waypoint_2_lat = waypoint_1_lat + math.degrees(delta_lat_2_3)
+    waypoint_2_lon = waypoint_1_lon + math.degrees(delta_lon_2_3)
+    waypoint_2_alt = current_alt  # Plane's current altitude
+    
+    # Waypoint 3: The target itself (end of the dive)
+    waypoint_3_lat = target_lat
+    waypoint_3_lon = target_lon
+    waypoint_3_alt = target_alt  # Target altitude
+
+    # Calculate the change in latitude/longitude for distance leaving the target
+    delta_lat_leave = (distance_leave / EARTH_RADIUS) * math.cos(azimuth_rad)
+    delta_lon_leave = (distance_leave / (EARTH_RADIUS * math.cos(math.radians(target_lat)))) * math.sin(azimuth_rad)
+
+    # Waypoint 4: Leaving point after the target
+    waypoint_4_lat = target_lat + math.degrees(delta_lat_leave)
+    waypoint_4_lon = target_lon + math.degrees(delta_lon_leave)
+    waypoint_4_alt = target_alt  # Altitude remains the same as the target altitude
+
+    waypoints = [
+        [waypoint_1_lat, waypoint_1_lon, waypoint_1_alt],
+        [waypoint_2_lat, waypoint_2_lon, waypoint_2_alt],
+        [waypoint_3_lat, waypoint_3_lon, waypoint_3_alt],
+        [waypoint_4_lat, waypoint_4_lon, waypoint_4_alt],
     ]
+    return waypoints
+
 
 def calculate_waypoint(latitude, longitude, distance, bearing):
     """

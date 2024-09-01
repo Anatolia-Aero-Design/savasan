@@ -10,12 +10,25 @@ class GPSNavigator:
     def __init__(self):
         self.navigation_active = False
         self.gps_sub = None
+        self.team_number = None
         self.command_service = rospy.ServiceProxy('/mavros/cmd/command', CommandLong)
 
         # Services to start and stop navigation
         self.start_service = rospy.Service('start_navigation', Empty, self.start_navigation)
         self.stop_service = rospy.Service('stop_navigation', Empty, self.stop_navigation)
+        
+        # Service to set team number
+        self.set_team_service = rospy.Service('set_team_number', Empty, self.set_team_number)
 
+    def set_team_number(self, req):
+        # Ask for team number input (you can also pass this through the service request if needed)
+        try:
+            self.team_number = int(input("Enter team number: "))
+            rospy.loginfo(f"Team number set to {self.team_number}")
+        except ValueError:
+            rospy.logerr("Invalid team number. Please enter a valid integer.")
+        return EmptyResponse()
+    
     def start_navigation(self, req):
         if not self.navigation_active:
             self.gps_sub = rospy.Subscriber('/konum_bilgileri', KonumBilgileri, self.gps_callback)
@@ -30,15 +43,22 @@ class GPSNavigator:
             print("Navigation stopped.")
         return EmptyResponse()
 
-    def gps_callback(self, msg:KonumBilgileri):
-        if not self.navigation_active:
+    def gps_callback(self, msg: KonumBilgileri):
+        if not self.navigation_active or self.team_number is None:
             return
 
         try:
-            latitude = msg.konumBilgileri[1].IHA_enlem            
-            longitude = msg.konumBilgileri[1].IHA_boylam
-            altitude = msg.konumBilgileri[1].IHA_irtifa
-            self.send_goto_command(latitude, longitude, altitude)
+            # Search for the target with the matching team number
+            target = next((konum for konum in msg.konumBilgileri if konum.takim_numarasi == self.team_number), None)
+
+            if target is not None:
+                latitude = target.IHA_enlem
+                longitude = target.IHA_boylam
+                altitude = target.IHA_irtifa
+                self.send_goto_command(latitude, longitude, altitude)
+            else:
+                rospy.logwarn(f"Team number {self.target_id} not found in the received data.")
+
         except Exception as e:
             rospy.logerr(f"Failed to parse GPS data: {e}")
 

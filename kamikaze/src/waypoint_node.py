@@ -76,7 +76,7 @@ class Waypoint_node:
         wp2.param3 = 0
         wp2.x_lat = calculated_waypoints[0][0]
         wp2.y_long = calculated_waypoints[0][1]
-        wp2.z_alt = self.HOME_ALTITUDE
+        wp2.z_alt = calculated_waypoints[0][2]
         waypoints.waypoints.append(wp2)
 
         wp3 = Waypoint()
@@ -89,7 +89,7 @@ class Waypoint_node:
         wp3.param3 = 0
         wp3.x_lat = calculated_waypoints[1][0]
         wp3.y_long = calculated_waypoints[1][1]
-        wp3.z_alt = self.HOME_ALTITUDE
+        wp3.z_alt = calculated_waypoints[1][2]
         waypoints.waypoints.append(wp3)
 
         wp4 = Waypoint()
@@ -115,7 +115,7 @@ class Waypoint_node:
         wp5.param3 = 0
         wp5.x_lat  = calculated_waypoints[3][0]
         wp5.y_long = calculated_waypoints[3][1]
-        wp5.z_alt  = self.HOME_ALTITUDE
+        wp5.z_alt  = calculated_waypoints[3][2]
         waypoints.waypoints.append(wp5)
 
         success = self.push_waypoints(waypoints)

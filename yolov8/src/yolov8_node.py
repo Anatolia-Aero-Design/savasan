@@ -82,6 +82,11 @@ class YOLOv8TrackingNode:
 		print(t2 - t1)
 		t3 = time.time()
 		result = results[0].boxes.xyxy.cpu().numpy()
+		try:
+			track_ids = results[0].boxes.id.int().cpu().tolist()
+		except AttributeError:
+			pass
+		frame = results[0].plot()
 
 		if len(result > 0):
 			self.xyxy.header.stamp = data.header.stamp
@@ -186,7 +191,6 @@ class YOLOv8TrackingNode:
 		cv2.putText(image, f"Roll: {roll:.2f} deg", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 		
   		
-
 if __name__ == '__main__':
 	rospy.init_node('yolov8_tracking_node', anonymous=True)
 	yolov8_tracking_node = YOLOv8TrackingNode()

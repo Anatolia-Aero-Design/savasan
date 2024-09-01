@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 
 import json
-from queue import Empty
-from flask import session
 import rospy
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix, TimeReference
 from std_msgs.msg import Float64, Bool, String
-from geometry_msgs.msg import TwistStamped
+from std_srvs.srv import Empty
 from mavros_msgs.msg import State
+from geometry_msgs.msg import TwistStamped
 import requests
 import logging
 from server_comm.msg import KonumBilgileri, KonumBilgisi
@@ -30,7 +29,10 @@ class Comm_Node:
         self.server_url_kilitlenme_bilgisi = rospy.get_param('/comm_node/api/kilitlenme_bilgisi')
         self.server_url_sunucusaati = rospy.get_param('/comm_node/api/sunucusaati')
         self.server_url_kamikaze_bilgisi = rospy.get_param('/comm_node/api/kamikaze_bilgisi')
+        
+        self.abort_service = rospy.Service('stop_kamikaze', Empty, self.qr_check)
 
+        # Initialize variables as None
         self.imu = None
         self.battery = None
         self.rel_alt = None
@@ -40,11 +42,9 @@ class Comm_Node:
         self.lock_on = None
         self.kilit = None
         self.qr_data = None
+        self.qr_published = False
         self.fcu_time = None
         self.fcu_time_nsecs = None
-        
-        self.TARGET_LATITUDE = None
-        self.TARGET_LONGITUDE = None
         
         self.bbox = None
         self.bbox_x = None
@@ -74,8 +74,7 @@ class Comm_Node:
             print("error")
             logging.error(f"An error occurred in process_data: {str(e)}")
         
-        finally:
-            self.process_data()
+        self.process_data()
         
         # Initialize Publishers
         self.server_time_pub = rospy.Publisher('/server_time', String, queue_size=10)
@@ -88,7 +87,6 @@ class Comm_Node:
         self.fcu_time = msg.time_ref.secs
         self.fcu_time_nsecs = msg.time_ref.nsecs
         
-    
     def imu_callback(self, msg):
         self.imu = msg
         self.process_data()
@@ -112,10 +110,16 @@ class Comm_Node:
     def state_callback(self, msg):
         self.state = msg
         self.process_data()
+    
+    def qr_check(self,req):
+        self.qr_published=False
         
     def qr_callback(self,msg):
-        self.qr_data = msg.data
-        self.publish_qr()
+        if self.qr_published is False:  # Check if the QR data has already been published
+            self.qr_data = msg.data
+            self.publish_qr()
+        else:
+            rospy.loginfo("qr zaten okundu aga")
 
     def lock_on_callback(self, msg):
         self.lock_on = msg
@@ -171,6 +175,7 @@ class Comm_Node:
         iha_kilitlenme = 1 if self.kilit else 0
         
         try:
+            self.get_server_time()
             # Convert quaternion to euler angles
             roll, pitch, yaw = quaternion_to_euler(self.imu.orientation.x,
                                                    self.imu.orientation.y,
@@ -242,7 +247,7 @@ class Comm_Node:
         now = datetime.now()
         return now.hour, now.minute, now.second, now.microsecond
         
-    def send_lock_on_info(self, kilit_msg, lock_on_msg): # while this function is running server communication is being lost
+    def send_lock_on_info(self, kilit_msg, lock_on_msg): 
         while True:
             if kilit_msg is None and self.kilit_prev is None:
                 pass
@@ -280,7 +285,7 @@ class Comm_Node:
             time.sleep(0.1)
 
     def publish_qr(self):
-        #if self.qr_data:
+        if self.qr_data is not None:
                 try:
                     start_time = rospy.get_param('/kamikazeBaslangicZamani', [0, 0, 0, 0])
                     end_time = rospy.get_param('/kamikazeBitisZaman', [0, 0, 0, 0])
@@ -304,15 +309,15 @@ class Comm_Node:
                     print("Correction Timing Dictionary:")
                     print(json.dumps(data_dict, indent=4))
                     # Here you could send the data, save it to a file, etc.
-                    response = self.session.post(self.server_url_qr_bilgisi, json=data_dict)
+                    response = self.session.post(self.server_url_kamikaze_bilgisi, json=data_dict)
                     if response.status_code == 200:
-                        logging.info(f"Lock-on data sent successfully: {response.json()}")
+                        logging.info(f"QR DATA SENT SUCCESFULLY {response}")
                     else:
                         logging.error(f"Failed to send lock-on data, status code: {response.status_code}")
                 except KeyError:
                     rospy.logerr("Failed to retrieve start or end time from ROS parameters.")
-        #else:
-        #       rospy.logerr("no qr_data available")
+        else:
+               rospy.logerr("no qr_data available")
 
     def get_server_time(self):
         try:
@@ -320,9 +325,8 @@ class Comm_Node:
             if response.status_code == 200:
                 server_time = response.json()
                 logging.info(f"Server time retrieved successfully: {server_time}")
-                time_str = f"{server_time['gun']}:{server_time['saat']}:{server_time['dakika']}:{server_time['saniye']}:{server_time['milisaniye']}"
+                time_str = f"{server_time['saat']}:{server_time['dakika']}:{server_time['saniye']}:{server_time['milisaniye']}"
                 self.server_time_pub.publish(time_str)
-                print(time_str)
                 return time_str
             else:
                 logging.error(f"Failed to retrieve server time, status code: {response.status_code}")
