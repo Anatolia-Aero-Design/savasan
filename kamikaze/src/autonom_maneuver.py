@@ -37,12 +37,13 @@ class AttitudeController:
         self.attitude_pub = rospy.Publisher(
             "/mavros/setpoint_raw/attitude", AttitudeTarget, queue_size=10
         )
-        self.rate = rospy.Rate(20)  # 10 Hz
+        self.rate = rospy.Rate(10)  # 10 Hz
 
     def set_attitude(self, roll, pitch, yaw, thrust):
         attitude = AttitudeTarget()
         attitude.orientation = utils.euler_to_quaternion(roll, pitch, yaw)
         attitude.thrust = thrust
+        rospy.logerr(attitude)
         self.attitude_pub.publish(attitude)
 
 
@@ -81,8 +82,8 @@ class WaypointNode:
 
         self.attitude_controller = AttitudeController()
 
-        self.yaw_pid = PIDController(kp=1, ki=0.4, kd=0.05)
-        self.pitch_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
+        self.yaw_pid = PIDController(kp=0.5, ki=0.4, kd=0.05)
+        self.pitch_pid = PIDController(kp=0.5, ki=0.0, kd=0.1)
 
         self.start_service = rospy.Service("start_kamikaze", Empty, self.start_waypoint)
         self.abort_service = rospy.Service("stop_kamikaze", Empty, self.stop_mission)
@@ -199,9 +200,6 @@ class WaypointNode:
                 rospy.loginfo("QR code not detected.")
 
             if distance <= 150 and self.altitude > 50:
-                rospy.loginfo(f"PITCH: {self.pitch}")
-                rospy.loginfo(f"ROLL: {self.roll}")
-                rospy.loginfo(f"DISTANCE: {distance}")
                 if self.qr_start_initialized is False:
                     self.start_time = self.get_current_time()
                     rospy.set_param("/kamikazeBaslangicZamani", self.start_time)
@@ -209,9 +207,6 @@ class WaypointNode:
 
                 self.perform_correction(yaw_error, pitch_error, dt)
 
-                rospy.loginfo(f"yaw error: {yaw_error}")
-                rospy.loginfo(f"pitch error: {pitch_error}")
-                rospy.loginfo(f"ALTITUDE: {self.altitude}")
             # elif distance <= 50 and self.altitude > 40:
             #   self.perform_dive_maneuver(roll_error, -35, dt,distance)
 
@@ -324,12 +319,18 @@ class WaypointNode:
         roll_correction = max(min(roll_correction, 20), -20)
         pitch_correction = max(min(pitch_correction, 25), -70)
         
-        pitch = -(math.radians(pitch_correction))
-        roll = math.radians(roll_correction)
-
-        self.attitude_controller.set_attitude(roll, pitch, 0, 0.0)
+        if 0.1>roll_correction>-0.1:
+            roll_correction = 0
+        if 0.1>pitch_correction>-0.1:
+            pitch_correction = 0
+        
         rospy.loginfo(f"roll correction: {roll_correction},")
-        rospy.loginfo(f"pitch correction: {pitch},")
+        rospy.loginfo(f"pitch correction: {pitch_error},")
+        pitch = pitch_error
+        roll = roll_correction
+
+        
+        self.attitude_controller.set_attitude(0, pitch, 0, 0)
         return roll
 
     def perform_climb_maneuver(self):
