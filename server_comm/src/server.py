@@ -12,13 +12,15 @@ def update_data():
     response = competition.response_json()
 
     # Print the received data
-    print(f"Received data: {json_data}")
+    #print(f"Received data: {json_data}")
+
     return jsonify(response), 200
 
 @app.route('/api/kilitlenme_bilgisi', methods=['POST'])
 def kenetlenme_bilgisi_gonder():
     json_data = request.get_json()
-    print(f"Received lock-on data: {json_data}")
+
+    #print(f"Received lock-on data: {json_data}")
     competition.update_lock_on(json_data)
     response = competition.response_json()
 
@@ -29,19 +31,56 @@ def get_server_time():
     current_time = competition.get_current_time()  # Add a method to get only the current time
     return jsonify({"sunucusaati": current_time}), 200
 
+
+@app.route('/api/hss_koordinatlari', methods=['GET'])
+def hss_coordinates():
+    hss_koordinatlari = {
+        "sunucusaati": competition.get_current_time(),
+        "hss_koordinat_bilgileri": [
+            {
+                "id": 0,
+                "hssEnlem": 36.939879,
+                "hssBoylam": 35.532268,
+                "hssYaricap": 50
+            },
+            {
+                "id": 1,
+                "hssEnlem": 36.940047,
+                "hssBoylam": 35.537481,
+                "hssYaricap": 50
+            },
+            {
+                "id": 2,
+                "hssEnlem": 36.936330,
+                "hssBoylam": 35.531538,
+                "hssYaricap": 75
+            },
+            {
+                "id": 3,
+                "hssEnlem": 36.937116,
+                "hssBoylam": 35.537972,
+                "hssYaricap": 150
+            }
+        ]
+    }
+    return jsonify(hss_koordinatlari), 200
+
 @app.route('/api/qr_koordinati', methods=['GET'])
 def get_qr_coordinates():
-    qr_latitude = -35.36536282
-    qr_longtitude = 149.16626983
+    qr_latitude = 36.93824690
+    qr_longtitude = 35.52944677
+
     qr_coordinates = {
         "qrEnlem": qr_latitude,
         "qrBoylam": qr_longtitude
     }
     return jsonify(qr_coordinates), 200
 
-#@app.route('/api/kamikaze_bilgisi', methods=['POST'])
-#def kamikaze_bilgisi_gonder():
-
+@app.route('/api/kamikaze_bilgisi', methods=['POST'])
+def get_qr_data():
+    json_data = request.get_json()
+    print(f"qr data: {json_data}")
+    return jsonify({"qr data": json_data}), 200
 
 if __name__ == '__main__':
     competition = Competition()

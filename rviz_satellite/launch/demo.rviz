@@ -4,9 +4,14 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Global Options1
+        - /Status1
+        - /AerialMapDisplay1
+        - /TF1
         - /TF1/Tree1
         - /Image2
         - /Image3
+        - /Marker1
       Splitter Ratio: 0.5
     Tree Height: 226
   - Class: rviz/Selection
@@ -132,14 +137,6 @@ Visualization Manager:
       Transport Hint: raw
       Unreliable: false
       Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /uav_to_target_vector
-      Name: Marker
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -150,59 +147,7 @@ Visualization Manager:
   Tools:
     - Class: rviz/Interact
       Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
     - Class: rviz/Select
-    - Class: rviz/Measure
-    - Class: rviz/SetInitialPose
-      Theta std deviation: 0.2617993950843811
-      Topic: /initialpose
-      X std deviation: 0.5
-      Y std deviation: 0.5
-    - Class: rviz/SetGoal
-      Topic: /move_base_simple/goal
-    - Class: rviz/PublishPoint
-      Single click: true
-      Topic: /clicked_point
-  Value: true
-  Views:
-    Current:
-      Class: rviz/Orbit
-      Distance: 1038.55126953125
-      Enable Stereo Rendering:
-        Stereo Eye Separation: 0.05999999865889549
-        Stereo Focal Distance: 1
-        Swap Stereo Eyes: false
-        Value: false
-      Field of View: 0.7853981852531433
-      Focal Point:
-        X: 46.43266296386719
-        Y: 325.6479797363281
-        Z: 396.169189453125
-      Focal Shape Fixed Size: false
-      Focal Shape Size: 0.05000000074505806
-      Invert Z Axis: false
-      Name: Current View
-      Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7447970509529114
-      Target Frame: map
-      Yaw: 1.155401349067688
-    Saved: ~
-Window Geometry:
-  Displays:
-    collapsed: false
-  Height: 1043
-  Hide Left Dock: false
-  Hide Right Dock: false
-  Image:
-    collapsed: false
-  QMainWindow State: 000000ff00000000fd00000001000000000000035c000003b9fc020000000afb000000100044006900730070006c006100790073000000003d0000016d000000c900fffffffb0000001200530065006c0065006300740069006f006e000000026a0000010f0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007300000002c0000000cf0000005c00fffffffb0000000a0056006900650077007300000002cf000000d1000000a400fffffffb0000000800540069006d006500000001f80000005c0000003900fffffffb0000000a0049006d006100670065010000003d000000ef0000001600fffffffb0000000a0049006d00610067006501000001320000011c0000001600fffffffb0000000c00430061006d00650072006100000002800000015b0000000000000000fb0000000a0049006d0061006700650100000254000001a20000001600fffffffb0000000a0049006d00610067006501000002a50000015100000000000000000000041e000003b900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
-  Selection:
-    collapsed: false
-  Time:
-    collapsed: false
-  Tool Properties:
-    collapsed: false
-  Views:
-    collapsed: false
-  Width: 1920
-  X: 0
-  Y: 0
+    - Class: rviz/FocusCamera
+    - Class: rviz/Select
