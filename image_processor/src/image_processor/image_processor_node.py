@@ -147,11 +147,10 @@ class ImageProcessorNode:
     
     def server_time_callback(self, msg):
         self.server_time = msg.data
-        rospy.loginfo(f"Received server time:")
 
     def server_time_printer(self, image_msg):
       if self.server_time:
-        rospy.loginfo(f"Printing server time")
+        
         server_time_text = str(self.server_time)
         text_size, _ = cv2.getTextSize(server_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
         # Calculate the position for the top-right corner

@@ -272,6 +272,10 @@ class Comm_Node:
                 formatted_time_str = json.dumps(formatted_time_dict)
                 self.server_time_pub.publish(formatted_time_str)
                 return formatted_time_dict
+                time_str = f"{server_time['gun']}:{server_time['saat']}:{server_time['dakika']}:{server_time['saniye']}:{server_time['milisaniye']}"
+                self.server_time_pub.publish(time_str)
+
+                return time_str
             else:
                 logging.error(f"Failed to retrieve server time, status code: {response.status_code}")
                 return None
