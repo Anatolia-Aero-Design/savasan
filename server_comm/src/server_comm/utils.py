@@ -2,7 +2,9 @@ from scipy.spatial.transform import Rotation as R
 from roslibpy import Message
 import json
 import math
+
 from datetime import datetime, timezone
+
 
 def calculate_speed(x, y, z):
     speed = math.sqrt(x**2 + y**2 + z**2)
@@ -13,6 +15,7 @@ def mode_guided(mode):
         return 0
     else: 
         return 1
+
     
 def unix_to_utc_formatted(unix_time, nsecs):
     # Convert Unix epoch time to UTC datetime
@@ -27,6 +30,7 @@ def unix_to_utc_formatted(unix_time, nsecs):
 
     
     return formatted_time
+
 
 def quaternion_to_euler(x, y, z, w):
     quat = [w, x, y, z]  # Quaternion sırası w, x, y, z

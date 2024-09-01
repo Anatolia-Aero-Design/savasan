@@ -7,13 +7,16 @@ from sensor_msgs.msg import Imu, BatteryState, NavSatFix,TimeReference
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64, Bool, String
 from std_srvs.srv import Empty
+
 from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
 import requests
 import json
 import logging
 from server_comm.msg import KonumBilgileri, KonumBilgisi
+
 from utils import quaternion_to_euler, calculate_speed, unix_to_utc_formatted
+
 from datetime import datetime
 import time
 import threading
@@ -21,20 +24,22 @@ from image_processor.msg import Yolo_xywh
 
 class Comm_Node:
     def __init__(self):
+
         self.session = requests.Session()
         self.base_url = 'http://savasaniha.baykartech.com/api'
         self.username = 'estuanatolia'
         self.password = '2Eqtm3v3ZJ'
         self.team_number = None
-       
-       
+
         # Get server APIs from sim.launch params
         self.server_url_telemetri_gonder = rospy.get_param('/comm_node/api/telemetri_gonder')
         self.server_url_kilitlenme_bilgisi = rospy.get_param('/comm_node/api/kilitlenme_bilgisi')
         self.server_url_sunucusaati = rospy.get_param('/comm_node/api/sunucusaati')
+
         self.server_url_kamikaze_bilgisi = rospy.get_param('/comm_node/api/kamikaze_bilgisi')
         
         self.abort_service = rospy.Service('stop_kamikaze', Empty, self.qr_check)
+
 
         self.imu = None
         self.battery = None
@@ -70,19 +75,22 @@ class Comm_Node:
             self.lock_on_sub = rospy.Subscriber('/lock_on_status', Bool, self.lock_on_callback)
             self.kilit_sub = rospy.Subscriber('/kilit', Bool, self.kilit_callback)
             self.bbox_sub = rospy.Subscriber("/yolov8/xywh", Yolo_xywh, self.bbox_callback)
+
             self.qr_sub = rospy.Subscriber("/qr_code_data", String, self.qr_callback)
             self.fcu_time_sub = rospy.Subscriber("/mavros/time_reference", TimeReference, self.fcu_time_callback)
+
         
         except Exception as e:
             print("error")
             logging.error(f"An error occurred in process_data: {str(e)}")
-        
+
         
         self.process_data()
 
         # Initialize Publishers
         self.server_time_pub = rospy.Publisher('/server_time', String, queue_size=10)
         self.konum_pub = rospy.Publisher('/konum_bilgileri', KonumBilgileri, queue_size=10)
+
 
         # Configure logging
         logging.basicConfig(filename='/home/poyrazzo/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -104,11 +112,14 @@ class Comm_Node:
     def lock_on_callback(self, msg):
         self.lock_on = msg.data
         rospy.loginfo(f"Received lock_on_status: {msg.data}")
+
         self.process_data()
     
     def kilit_callback(self, msg):
         self.kilit = msg.data
         rospy.loginfo(f"Received kilit: {msg.data}")
+
+
         self.process_data()
 
         self.lock_on_thread = threading.Thread(target=self.send_lock_on_info)
@@ -149,6 +160,7 @@ class Comm_Node:
         rospy.loginfo(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
         logging.info(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
         self.process_data()
+
         
     def login(self):
         url = f"{self.base_url}/giris"
@@ -170,6 +182,7 @@ class Comm_Node:
             print("Response:", response.text)
         return response
 
+
     def process_data(self):
         if not (self.imu and self.battery and self.rel_alt and self.position and self.speed and self.state):
             return
@@ -182,7 +195,9 @@ class Comm_Node:
         iha_kilitlenme = 1 if self.kilit else 0
 
         try:
+
             self.get_server_time()
+
 
             # Convert quaternion to euler angles
             roll, pitch, yaw = quaternion_to_euler(self.imu.orientation.x,
@@ -192,7 +207,9 @@ class Comm_Node:
 
             # Prepare data dictionary
             data_dict = {
+
                 "takim_numarasi": self.team_number,
+
                 "IHA_enlem": self.position.latitude,
                 "IHA_boylam": self.position.longitude,
                 "IHA_irtifa": self.rel_alt.data,
@@ -207,6 +224,7 @@ class Comm_Node:
                 "hedef_merkez_Y": self.bbox_y,
                 "hedef_genislik": self.bbox_w,
                 "hedef_yukseklik": self.bbox_h,
+
                 "gps_saati": unix_to_utc_formatted(self.fcu_time, self.fcu_time_nsecs)
             }
             
@@ -214,6 +232,7 @@ class Comm_Node:
 
             # Send data to the server
             response = self.session.post(self.server_url_telemetri_gonder, json=data_dict)
+
             logging.info(f"Sent data to server: {data_dict}")
 
             # Check server response
@@ -291,7 +310,9 @@ class Comm_Node:
                         print("Lock-on Info Dictionary:")
                         print(json.dumps(data_dict, indent=4))
 
+
                         response = self.session.post(self.server_url_kilitlenme_bilgisi, json=data_dict)
+
                         if response.status_code == 200:
                             logging.info(f"Lock-on data sent successfully: {response.json()}")
                         else:
@@ -301,6 +322,7 @@ class Comm_Node:
                         logging.error(f"An error occurred while sending lock-on data: {str(e)}")
 
             self.kilit_prev = self.kilit  # Update previous status
+
             time.sleep(0.1),
             
     def publish_qr(self):
@@ -361,6 +383,7 @@ class Comm_Node:
                 self.server_time_pub.publish(time_str)
                 print(time_str)
                 return time_str
+
             else:
                 logging.error(f"Failed to retrieve server time, status code: {response.status_code}")
                 return None
@@ -369,10 +392,13 @@ class Comm_Node:
             return None
 
 
+
 if __name__ == '__main__':
     rospy.init_node('comm_node', anonymous=True)
     comm_node = Comm_Node()
+
     comm_node.login()
+
     try:
         rospy.spin()
     except rospy.ROSInterruptException:

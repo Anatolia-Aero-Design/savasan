@@ -16,8 +16,10 @@ f = 1 / 298.257223563 # Flattening
 e2 = 2*f - f**2  
 
 def geodetic_to_enu(lat, lon, alt):
+
     lat_ref =  36.93824690
     lon_ref = 35.52944677
+
     alt_ref = 0
     # Convert degrees to radians
     lat_ref = np.deg2rad(lat_ref)
@@ -60,11 +62,14 @@ transformer = Transformer.from_crs(wgs84, utm_zone33)
 def callback(data: KonumBilgileri):
     # Parsing the incoming message
     marker_array = MarkerArray()
+
     for iha in data.konumBilgileri:
         if iha.takim_numarasi == 31:
             continue
         marker = create_marker(iha)
         marker_array.markers.append(marker)
+
+
 
     # Assign unique IDs to each marker in the array
     for i, marker in enumerate(marker_array.markers):
@@ -99,6 +104,7 @@ def create_marker(iha: KonumBilgisi):
     marker.color.a = 1.0
     marker.color.r = 0.0
     marker.color.g = 1.0
+
     marker.color.b = 0.0
 
     return marker
@@ -106,6 +112,7 @@ def create_marker(iha: KonumBilgisi):
 def listener():
     rospy.init_node('iha_subscriber', anonymous=True)
     rospy.Subscriber("/konum_bilgileri", KonumBilgileri, callback)
+
     rospy.spin()
 
 if __name__ == '__main__':
@@ -114,3 +121,4 @@ if __name__ == '__main__':
         listener()
     except rospy.ROSInterruptException:
         pass
+
