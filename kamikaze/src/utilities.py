@@ -3,8 +3,8 @@ from scipy.spatial.transform import Rotation as R
 import tf.transformations as tf_trans
 from geometry_msgs.msg import Quaternion
 import rospy
-from mavros_msgs.srv import CommandLong
 
+EARTH_RADIUS = 6371000
 def haversine_formula(latitude_1, longtitude_1, latitude_2, longtitude_2):
     R = 6371000 # Radius of the Earth in meters
     latitude_1_rad = math.radians(latitude_1)
@@ -22,8 +22,9 @@ def haversine_formula(latitude_1, longtitude_1, latitude_2, longtitude_2):
     return distance
 
 def euler_to_quaternion(roll, pitch, yaw):
-    quaternion = tf_trans.quaternion_from_euler(math.radians(roll), math.radians(pitch), math.radians(yaw))
+    quaternion = tf_trans.quaternion_from_euler(roll, pitch, yaw)
     return Quaternion(*quaternion)
+
 
 def quaternion_to_euler(w, x, y, z):
     """
@@ -101,52 +102,60 @@ def gps_to_xyz(home_lat, home_lon, home_alt, target_lat, target_lon, target_alt)
     
     return delta_x, delta_y, delta_z
 
-
-def send_command_long(target_system, target_component, command, confirmation, param1, param2, param3, param4, param5, param6, param7):
+def calculate_waypoint(latitude, longitude, distance, bearing):
     """
-    Send a COMMAND_LONG MAVLink message via MAVROS.
-
-    :param target_system: Target system (e.g., drone) ID
-    :param target_component: Target component ID (e.g., autopilot)
-    :param command: MAVLink command ID
-    :param confirmation: 0: First transmission of this command, 1-255: Confirmation transmissions (e.g. for kill command)
-    :param param1 to param7: Command parameters (use 0 if not needed)
-    :return: Success status and result of the command
+    Calculate a new waypoint given a starting coordinate, distance, and bearing.
     """
+    latitude_rad = math.radians(latitude)
+    longitude_rad = math.radians(longitude)
+    bearing_rad = math.radians(bearing)
 
-    # Wait for the service to be available
-    rospy.wait_for_service('/mavros/cmd/command')
+    latitude_dest_rad = math.asin(
+        math.sin(latitude_rad) * math.cos(distance / EARTH_RADIUS) +
+        math.cos(latitude_rad) * math.sin(distance / EARTH_RADIUS) * math.cos(bearing_rad)
+    )
 
+    longitude_dest_rad = longitude_rad + math.atan2(
+        math.sin(bearing_rad) * math.sin(distance / EARTH_RADIUS) * math.cos(latitude_rad),
+        math.cos(distance / EARTH_RADIUS) - math.sin(latitude_rad) * math.sin(latitude_dest_rad)
+    )
+
+    latitude_dest = math.degrees(latitude_dest_rad)
+    longitude_dest = math.degrees(longitude_dest_rad)
+
+    return latitude_dest, longitude_dest
+
+def calculate_waypoints_with_angle(target_lat, target_lon, angle_degrees, distance1, distance2, distance3):
+    R = 6371000  # Radius of the Earth
     try:
-        # Create a service proxy for the command_long service
-        command_long_service = rospy.ServiceProxy('/mavros/cmd/command', CommandLong)
+        # Convert latitude and longitude from degrees to radians
+        target_lat_rad = math.radians(target_lat)
+        target_lon_rad = math.radians(target_lon)
+        angle_rad = math.radians(angle_degrees)
 
-        # Call the service
-        response = command_long_service(target_system,
-                                        target_component,
-                                        command,
-                                        confirmation,
-                                        param1,
-                                        param2,
-                                        param3,
-                                        param4,
-                                        param5,
-                                        param6,
-                                        param7)
+        # Calculate the waypoint at a certain distance and angle
+        def calculate_waypoint(lat_rad, lon_rad, distance, angle):
+            lat_new_rad = math.asin(math.sin(lat_rad) * math.cos(distance / R) +
+                                    math.cos(lat_rad) * math.sin(distance / R) * math.cos(angle))
+            lon_new_rad = lon_rad + math.atan2(math.sin(angle) * math.sin(distance / R) * math.cos(lat_rad),
+                                               math.cos(distance / R) - math.sin(lat_rad) * math.sin(lat_new_rad))
+            return lat_new_rad, lon_new_rad
 
-        # Check the response and return the result
-        if response.success:
-            rospy.loginfo(f"Command {command} sent successfully with result {response.result}")
-        else:
-            rospy.logwarn(f"Failed to send command {command} with result {response.result}")
+        # Calculate waypoints
+        wp1_lat_rad, wp1_lon_rad = calculate_waypoint(target_lat_rad, target_lon_rad, distance1, angle_rad)
+        wp2_lat_rad, wp2_lon_rad = calculate_waypoint(target_lat_rad, target_lon_rad, distance2, angle_rad)
+        wp5_lat_rad, wp5_lon_rad = calculate_waypoint(target_lat_rad, target_lon_rad, distance3, angle_rad + math.pi)  # Adding pi to get the opposite direction
 
-        return response.success, response.result
+        # Convert back to degrees
+        wp1_lat_deg, wp1_lon_deg = math.degrees(wp1_lat_rad), math.degrees(wp1_lon_rad)
+        wp2_lat_deg, wp2_lon_deg = math.degrees(wp2_lat_rad), math.degrees(wp2_lon_rad)
+        wp5_lat_deg, wp5_lon_deg = math.degrees(wp5_lat_rad), math.degrees(wp5_lon_rad)
 
-    except rospy.ServiceException as e:
-        rospy.logerr(f"Service call failed: {e}")
-        return False, None
+        return [(wp1_lat_deg, wp1_lon_deg),
+                (wp2_lat_deg, wp2_lon_deg),
+                (target_lat, target_lon),  # Target waypoint is just the target
+                (wp5_lat_deg, wp5_lon_deg)]
 
-
-
-
-
+    except Exception as e:
+        rospy.logerr(f"Error calculating waypoints: {e}")
+        return []  # Ensure it returns an empty list on error

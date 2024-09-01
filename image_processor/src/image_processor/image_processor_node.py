@@ -13,9 +13,6 @@ import cv2
 import message_filters
 import time
 from std_msgs.msg import Int32, Bool, String
-import json
-import requests
-import logging
 
 
 
@@ -61,10 +58,10 @@ class ImageProcessorNode:
             cv2.rectangle(frame, (bbox_x, bbox_y), (bbox_w, bbox_h), (0, 0, 255), 2) # thickness max value must be 3
                                                                                      # color must be red (0, 0, 255)                                                                        
         # Draw target area
-        target_box_x = int(1280 * 0.25)
-        target_box_y = int(720 * 0.1)
-        target_box_w = int(1280 * 0.75)
-        target_box_h = int(720 * 0.9)
+        target_box_x = int(640 * 0.25)
+        target_box_y = int(360 * 0.1)
+        target_box_w = int(640 * 0.75)
+        target_box_h = int(360 * 0.9)
         cv2.rectangle(frame, (target_box_x, target_box_y), (target_box_w, target_box_h), (0, 255, 0), 2) # thickness max value must be 3
         
         bbox_coordinates = bbox_x, bbox_y, bbox_w, bbox_h
@@ -147,7 +144,7 @@ class ImageProcessorNode:
     
     def server_time_callback(self, msg):
         self.server_time = msg.data
-        rospy.loginfo(f"Received server time:")
+        #rospy.loginfo(f"Received server time:")
 
     def server_time_printer(self, image_msg):
       if self.server_time:
@@ -171,3 +168,4 @@ if __name__ == '__main__':
         rospy.spin()
     except KeyboardInterrupt:
         rospy.loginfo("Shutting down BBox Drawer node")
+

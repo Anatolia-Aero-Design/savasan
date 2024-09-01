@@ -37,13 +37,23 @@ class AttitudeController:
         self.attitude_pub = rospy.Publisher(
             "/mavros/setpoint_raw/attitude", AttitudeTarget, queue_size=10
         )
-        self.rate = rospy.Rate(10)  # 10 Hz
+        self.rate = rospy.Rate(20)  # 10 Hz
 
-    def set_attitude(self, roll, pitch, yaw, thrust):
+    def set_attitude(self, rollx, pitchx, yawx, thrust):
+        
+        roll = math.radians(rollx)
+        pitch = math.radians(pitchx)
+        yaw = math.radians(yawx)
+        
         attitude = AttitudeTarget()
         attitude.orientation = utils.euler_to_quaternion(roll, pitch, yaw)
+        print(f"roll{attitude.orientation }")
         attitude.thrust = thrust
-        rospy.logerr(attitude)
+        # Optionally, set the type_mask to ignore angular rates
+        attitude.type_mask = AttitudeTarget.IGNORE_ROLL_RATE | \
+                             AttitudeTarget.IGNORE_PITCH_RATE | \
+                             AttitudeTarget.IGNORE_YAW_RATE
+
         self.attitude_pub.publish(attitude)
 
 
@@ -82,8 +92,8 @@ class WaypointNode:
 
         self.attitude_controller = AttitudeController()
 
-        self.yaw_pid = PIDController(kp=0.5, ki=0.4, kd=0.05)
-        self.pitch_pid = PIDController(kp=0.5, ki=0.0, kd=0.1)
+        self.yaw_pid = PIDController(kp=1, ki=0.4, kd=0.05)
+        self.pitch_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
 
         self.start_service = rospy.Service("start_kamikaze", Empty, self.start_waypoint)
         self.abort_service = rospy.Service("stop_kamikaze", Empty, self.stop_mission)
@@ -153,21 +163,21 @@ class WaypointNode:
         if self.latitude is None or self.longitude is None or self.altitude is None:
             rospy.logwarn("Current position data is incomplete.")
             return
-        self.distance = utils.haversine_formula(
-            self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE
-        )
+
 
         current_time = rospy.get_time()
         dt = current_time - self.prev_time
         self.prev_time = current_time
-
+        self.distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
+                    
         if self.distance >= 150 and not self.command_sent:
-            # Send position command to target
-            self.send_position_command(
-                self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE
-            )
-            self.command_sent = True
-            self.correct_heading()
+                # Send position command to target
+                self.send_position_command(
+                    self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE
+                )
+                self.command_sent = True
+                self.correct_heading()
+                
 
     def get_current_time(self):
         now = datetime.now()
@@ -186,11 +196,12 @@ class WaypointNode:
                 self.TARGET_LONGITUDE,
             )
 
-            yaw_error, pitch_error = self.calculate_errors(distance)
+            
             current_time = rospy.get_time()
             dt = current_time - self.prev_time
             self.prev_time = current_time
-
+            yaw_error, pitch_error = self.calculate_errors(distance)
+            
             rospy.loginfo(f"victor:{self.vector}")
             self.qr_detected = self.qr_reader.read_check()
             if self.qr_detected:
@@ -200,6 +211,9 @@ class WaypointNode:
                 rospy.loginfo("QR code not detected.")
 
             if distance <= 150 and self.altitude > 50:
+                rospy.loginfo(f"PITCH: {self.pitch}")
+                rospy.loginfo(f"ROLL: {self.roll}")
+                rospy.loginfo(f"DISTANCE: {distance}")
                 if self.qr_start_initialized is False:
                     self.start_time = self.get_current_time()
                     rospy.set_param("/kamikazeBaslangicZamani", self.start_time)
@@ -207,6 +221,9 @@ class WaypointNode:
 
                 self.perform_correction(yaw_error, pitch_error, dt)
 
+                rospy.loginfo(f"yaw error: {yaw_error}")
+                rospy.loginfo(f"pitch error: {  pitch_error}")
+                rospy.loginfo(f"ALTITUDE: {self.altitude}")
             # elif distance <= 50 and self.altitude > 40:
             #   self.perform_dive_maneuver(roll_error, -35, dt,distance)
 
@@ -316,22 +333,13 @@ class WaypointNode:
         roll_correction = self.yaw_pid.compute(yaw_error, dt)
         pitch_correction = self.pitch_pid.compute(pitch_error, dt)
         
-        roll_correction = max(min(roll_correction, 20), -20)
-        pitch_correction = max(min(pitch_correction, 25), -70)
+        #roll_correction = max(min(roll_correction, 20), -20)
+        #pitch_correction = max(min(pitch_correction, 25), -70)
         
-        if 0.1>roll_correction>-0.1:
-            roll_correction = 0
-        if 0.1>pitch_correction>-0.1:
-            pitch_correction = 0
-        
-        rospy.loginfo(f"roll correction: {roll_correction},")
-        rospy.loginfo(f"pitch correction: {pitch_error},")
-        pitch = pitch_error
-        roll = roll_correction
 
-        
-        self.attitude_controller.set_attitude(0, pitch, 0, 0)
-        return roll
+        self.attitude_controller.set_attitude(5, pitch_error/2, 0, 0.5)
+        #rospy.loginfo(f"roll correction: {roll_correction},")
+        #rospy.loginfo(f"pitch correction: {-pitch_correction},")
 
     def perform_climb_maneuver(self):
         rospy.loginfo("Entering climb maneuver")
@@ -365,7 +373,7 @@ class WaypointNode:
         target_altitude = 100  # Example: climb to 50 meters above home altitude
 
         # Set attitude for climb maneuver
-        yaw = self.y
+        yaw = self.yaw
         roll = 0.0
         pitch = -20.0  # Adjust pitch for climb
         thrust = 0.7  # Adjust thrust for climb
@@ -389,7 +397,7 @@ class WaypointNode:
         rospy.logwarn("kamikaze node uav location:")
 
         yaw_alpha = math.degrees(math.atan(self.vector.y / self.vector.x))
-        yaw_error = yaw_alpha - self.yaw
+        yaw_error = 180-(yaw_alpha - self.yaw)
 
         pitch_alpha = math.degrees(math.atan(distance / self.altitude))
         pitch_error = (90 - pitch_alpha) + self.pitch
