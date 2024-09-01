@@ -1,18 +1,20 @@
 #!/usr/bin/env python
 
-import dis
 from numpy import NaN
+import numpy as np
 import math
 import rospy
-from mavros_msgs.msg import AttitudeTarget
+from mavros_msgs.msg import AttitudeTarget,HomePosition
 from mavros_msgs.srv import WaypointClear, SetMode,CommandInt,CommandBool
 from std_srvs.srv import Empty, EmptyResponse
-from sensor_msgs.msg import NavSatFix, Imu
+from sensor_msgs.msg import NavSatFix
 from std_msgs.msg import Float64
 import utilities as utils
-from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Quaternion, PoseStamped, Vector3
-import threading
+from geometry_msgs.msg import PoseStamped, Vector3
+import pymap3d as pm
+from qr_reader import QRReader
+from datetime import datetime 
+
 
 class PIDController:
     def __init__(self, kp, ki, kd):
@@ -32,7 +34,7 @@ class PIDController:
 class AttitudeController:
     def __init__(self):
         self.attitude_pub = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
-        self.rate = rospy.Rate(10)  # 10 Hz
+        self.rate = rospy.Rate(20)  # 10 Hz
 
     def set_attitude(self, roll, pitch, yaw, thrust):
         attitude = AttitudeTarget()
@@ -43,24 +45,30 @@ class AttitudeController:
 class WaypointNode:
     def __init__(self) -> None:
         
+        self.prev_time = rospy.get_time()
+        
+        self.qr_detected = False
+        self.qr_start_initialized = False
+
         self.latitude = None
         self.longitude = None
         self.altitude = None
 
         self.qr_info = None
-        self.angle_degrees = 70
-        self.quaternion = None
         self.x, self.y, self.z = None, None, None
         self.vector = None
 
 
-        self.HOME_LATITUDE = -35.363212
-        self.HOME_LONGITUDE = 149.165210
-        self.HOME_ALTITUDE = 100.0
+        """self.HOME_LATITUDE = 36.9377789
+        self.HOME_LONGITUDE = 35.5353955
+        self.HOME_ALTITUDE = 100"""
         
-        self.TARGET_LATITUDE = -35.360849
-        self.TARGET_LONGITUDE = 149.161835
-        self.TARGET_ALTITUDE = 20.0
+        self.TARGET_LATITUDE = 39.82006598 
+        self.TARGET_LONGITUDE = 30.53404039  
+        self.TARGET_ALTITUDE = 100.0
+        
+        self.PITCH_CORRECTION_ALTITUDE = 0.0 
+        self.home_pose = None
         
         
         self.climb_waypoint = {
@@ -71,12 +79,12 @@ class WaypointNode:
 
         self.attitude_controller = AttitudeController()
 
-        self.roll_pid = PIDController(kp=2.0, ki=0.0, kd=0.1)
+        self.roll_pid = PIDController(kp=1, ki=0.4, kd=0.05)
         self.pitch_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
-        self.prev_time = rospy.get_time()
 
         self.start_service = rospy.Service('start_kamikaze', Empty, self.start_waypoint)
-        self.abort_service = rospy.Service('stop_kamikaze', Empty, self.abort_mission)
+        self.abort_service = rospy.Service('stop_kamikaze', Empty, self.stop_mission)
+        self.abort_service = rospy.Service('abort_kamikaze', Empty, self.abort_mission)
 
         # Set mode service
         self.set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
@@ -87,43 +95,30 @@ class WaypointNode:
         self.vector_sub = rospy.Subscriber('/uav_to_target_vector', Vector3, self.vector_callback)
         self.subscriber = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.position_callback)
         self.rel_altitude_sub = rospy.Subscriber('/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
+        self.home_sub = rospy.Subscriber('/mavros/home_position/home', HomePosition, self.home_callback)
+        
 
         self.set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
         self.command_int_srv = rospy.ServiceProxy('/mavros/cmd/command_int', CommandInt)
-        self.arm_srv = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
         
         self.callback_active = False
         self.command_sent = False 
-        
-        self.callback_thread = threading.Thread(target=self.run_callback_continuously)
-        self.callback_thread.daemon = True
-        self.callback_thread.start()
-
-        
-        
-    #def send_qr_info(self, msg):
-    #    self.qr_info = msg
-    #    if not None (self.qr_info):
-    #        try:
-    #            response = requests.post(self.server_url_kamikaze_bilgisi, json=self.qr_info)
-    #            logging.info(f"Sent kamikaze data to server: {self.mission_wps}")
-    #        except Exception as e:
-    #            logging.error(f"Failed to send data, status code: {response.status_code}")
     
-    def run_callback_continuously(self):
-        rate = rospy.Rate(1)  # 1 Hz
-        while not rospy.is_shutdown():
-            if self.callback_active:
-                self.callback()
-            rate.sleep()
 
 
-
+    def home_callback(self, data):
+        self.home_pose = np.array([data.geo.latitude, data.geo.longitude, data.geo.altitude])
+        self.HOME_LATITUDE = self.home_pose[0]
+        self.HOME_LONGITUDE = self.home_pose[1]
+        self.HOME_ALTITUDE = self.home_pose[2]
+        return self.HOME_ALTITUDE,self.HOME_LONGITUDE,self.HOME_LATITUDE
+        
     def quaternion_callback(self, data):
         self.x, self.y, self.z = utils.quaternion_to_euler_degrees(data.pose.orientation)
         
     def vector_callback(self, data):
         self.vector = data
+        
         
 
     def position_callback(self, data):
@@ -133,94 +128,130 @@ class WaypointNode:
         
     def rel_altitude_callback(self, data):
         self.altitude = float(data.data) # Extract data from the message
-    
-        
-    def timer_callback(self, event):
-        # Timer callback to repeatedly call the main logic
-        self.timer = rospy.Timer(rospy.Duration(1), self.timer_callback)
 
              
     def callback(self):
         if self.latitude is None or self.longitude is None or self.altitude is None:
+            rospy.logwarn("Current position data is incomplete.")
             return
-        distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
+        self.distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
         
-
         current_time = rospy.get_time()
         dt = current_time - self.prev_time
         self.prev_time = current_time
         
         
-        if distance >= 100 and not self.command_sent:
+        if self.distance >= 100 and not self.command_sent:
             # Send position command to target
              self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
              self.command_sent = True
+             self.correct_heading()
              
+             
+    def get_current_time(self):
+        now = datetime.now()
+        return now.hour, now.minute, now.second, now.microsecond
+                
+                
+    def correct_heading(self):
         while True:
+            if not self.callback_active :
+                rospy.loginfo("Mission stopped. Exiting correct_heading loop.")
+                break
             
             distance = utils.haversine_formula(self.latitude, self.longitude, self.TARGET_LATITUDE, self.TARGET_LONGITUDE)
-            if distance <= 50:
-                
-                # Check conditions to perform climb maneuver
-                if self.qr_info is not None or self.altitude <= 50:
-                    self.perform_climb_maneuver()
-
-            elif 50 < distance < 200:
-                roll_error, pitch_error = self.calculate_errors()
-                # If the distance is between 50 and 100 meters, just log the info
-                # Perform dive maneuver if within 50 meters
-                roll = self.perform_roll_correction(roll_error, dt)
+            
+            roll_error, pitch_error = self.calculate_errors()
+            current_time = rospy.get_time()
+            dt = current_time - self.prev_time
+            self.prev_time = current_time
+            
+            rospy.loginfo(f"vektor:{self.vector}")
+            self.qr_detected = self.qr_reader.read_check()
+            if self.qr_detected:
+                self.qr_info = True
+                #rospy.loginfo("QR code detected!")
+            else:
+                rospy.loginfo("QR code not detected.")
+            
+            if distance <= 150 and self.altitude > 50:
+                rospy.loginfo(f"PITCH: {-self.y}")
+                rospy.loginfo(f"ROLL: {self.x}")
+                rospy.loginfo(f"DISTANCE: {distance}")
+                if self.qr_start_initialized is False:
+                    self.start_time = self.get_current_time()
+                    rospy.set_param('/kamikazeBaslangicZamani', self.start_time)
+                    self.qr_start_initialized = True
+                 
+                self.perform_correction(roll_error,pitch_error, dt)
+            
                 rospy.loginfo(f"Roll error: {roll_error}")
-                self.perform_dive_maneuver(yaw=0, pitch=-70)
-                rospy.loginfo(f"Approaching target, distance: {distance} meters")
+                rospy.loginfo(f"pitch error: {pitch_error}")
+                rospy.loginfo(f"ALTITUDE: {self.altitude}")
+            #elif distance <= 50 and self.altitude > 40:
+            #   self.perform_dive_maneuver(roll_error, -35, dt,distance)
+                
+            elif self.qr_info or self.altitude <= 50:
+                self.end_time = self.get_current_time()
+                rospy.set_param('/kamikazeBitisZamani', self.end_time)
+                self.perform_climb_maneuver()
+                break
+            rospy.sleep(0.3)
 
     def start_waypoint(self, req):
-        try:
-            rospy.loginfo("Waypoint calculations started.")
-
-            
-            rospy.wait_for_service('/mavros/set_mode')
-            try:
-                response = self.set_mode_srv(custom_mode='GUIDED')
-                if response.mode_sent:
-                    rospy.loginfo("Mode set to GUIDED")
-                else:
-                    rospy.logerr("Failed to set mode to GUIDED")
-                    return EmptyResponse()
-            except rospy.ServiceException as e:
-                rospy.logerr("Service call failed: %s" % e)
-                return EmptyResponse()
-
-            rospy.wait_for_service('/mavros/cmd/arming')
-            try:
-                response = self.arm_srv(True)
-                if response.success:
-                    rospy.loginfo("Plane armed")
-                else:
-                    rospy.logerr("Failed to arm the plane")
-                    return EmptyResponse()
-            except rospy.ServiceException as e:
-                rospy.logerr("Service call failed: %s" % e)
-                return EmptyResponse()
-            
-            
-            self.callback_active = True
+        
+        self.qr_reader = QRReader()
+        if self.home_pose is None:
+            rospy.logwarn("Home pose not available yet.")
             return EmptyResponse()
-        except rospy.ServiceException as e:
-            rospy.logerr("Service call failed: %s", e)
-            return EmptyResponse()
-
-
-
+        
+        self.callback_active = True
+        self.callback()
+        return EmptyResponse()
+        
     def abort_mission(self, req):
+        self.perform_climb_maneuver()
+        
+    def stop_mission(self, req):
         try:
+            # Stop any ongoing mission
             self.callback_active = False
             rospy.loginfo("Aborting mission.")
+            self.qr_start_initialized = False
+            
+
+            # Clear existing waypoints
+            rospy.wait_for_service('/mavros/mission/clear')
+            try:
+                clear_wp_srv = rospy.ServiceProxy('/mavros/mission/clear', WaypointClear)
+                response = clear_wp_srv()
+                if response.success:
+                    rospy.loginfo("Cleared previous waypoints")
+                else:
+                    rospy.logwarn("Failed to clear waypoints")
+            except rospy.ServiceException as e:
+                rospy.logerr(f"Failed to clear waypoints: {e}")
+                return EmptyResponse()
+
+            # Set mode to LOITER
+            rospy.wait_for_service('/mavros/set_mode')
+            try:
+                set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
+                response = set_mode_srv(custom_mode='LOITER')
+                if response.mode_sent:
+                    rospy.loginfo("Mode set to LOITER")
+                else:
+                    rospy.logwarn("Failed to set mode to LOITER")
+            except rospy.ServiceException as e:
+                rospy.logerr(f"Service call failed: {e}")
+                return EmptyResponse()
+
             self.command_sent = False
             return EmptyResponse()
         except rospy.ServiceException as e:
             rospy.logerr(f"Service call failed: {e}")
             return EmptyResponse()
+            
         
     def send_position_command(self, latitude, longitude, altitude):
         try:
@@ -245,48 +276,80 @@ class WaypointNode:
             rospy.logerr(f"Service call failed: {e}")
             
             
-    def perform_roll_correction(self, roll_error, dt):
-        """Perform roll correction based on error."""
-        roll_correction = self.roll_pid.compute(roll_error, dt)
-        roll = math.radians(roll_correction)
-        pitch = 0
-        yaw = 0
-        thrust = 0.5
-        rospy.loginfo(f"Performing roll correction with error: {roll_error:.2f} degrees")
-        self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
-        return roll
-
-    def perform_pitch_correction(self, pitch_error, dt):
-        """Perform pitch correction based on error."""
-        pitch_correction = self.pitch_pid.compute(pitch_error, dt)
-        pitch = math.radians(pitch_correction)
-        yaw = 0
-        roll = 0.0
-        thrust = 0.5
-        rospy.loginfo(f"Performing pitch correction with error: {pitch_error:.2f} degrees")
-        self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
-        return pitch
-
-    def perform_dive_maneuver(self, yaw, pitch):
-        roll = 0.0  # Maintain current roll
-        thrust = 0.7  # Adjust as needed for your maneuver
-
-        # Set the new target position for the dive
-        dive_target_latitude = self.TARGET_LATITUDE  # You can adjust this as needed
-        dive_target_longitude = self.TARGET_LONGITUDE  # You can adjust this as needed
-        dive_target_altitude = self.altitude - 50  # Example: Dive 10 meters lower; adjust as needed
-
-        # Perform the dive maneuver
-        rospy.loginfo(f"Performing dive maneuver with pitch: {pitch}, thrust: {thrust}")
-        self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
+    def perform_correction(self, roll_error,pitch_error, dt):
+        """Perform correction based on error."""
         
-        # Send the position command to the new target position
-        self.send_position_command(dive_target_latitude, dive_target_longitude, dive_target_altitude)
+           # Clear existing waypoints
+        rospy.wait_for_service('/mavros/mission/clear')
+        try:
+            clear_wp_srv = rospy.ServiceProxy('/mavros/mission/clear', WaypointClear)
+            response = clear_wp_srv()
+            if response.success:
+                rospy.loginfo("Cleared previous waypoints")
+            else:
+                rospy.logwarn("Failed to clear waypoints")
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Failed to clear waypoints: {e}")
+            return
+        
+        
+       # self.send_position_command(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, 0.0)
+        
 
-        rospy.loginfo(f"Dive maneuver set to new altitude: {dive_target_altitude} meters with thrust: {thrust}")
+        roll_correction = self.roll_pid.compute(roll_error, dt)
+        pitch_correction = (self.pitch_pid.compute(pitch_error, dt))
+
+        pitch = -(math.radians(pitch_correction))
+        roll = math.radians(roll_correction)
+        
+        self.attitude_controller.set_attitude(roll_correction, pitch, 0, 0)
+        rospy.loginfo(f"roll correction: {roll_correction},")
+        rospy.loginfo(f"pitch correction: {pitch},")
+        return roll
+    
+
+    """def perform_dive_maneuver(self,roll_error,pitch,dt,distance):
+        
+         # Clear existing waypoints
+        rospy.wait_for_service('/mavros/mission/clear')
+        try:
+            clear_wp_srv = rospy.ServiceProxy('/mavros/mission/clear', WaypointClear)
+            clear_wp_srv()
+            
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Failed to clear waypoints: {e}")
+            return
+        
+        rospy.loginfo(f"Performing DIVE")
+        roll_correction = self.roll_pid.compute(roll_error, dt)
+        roll = (math.radians(roll_correction))/10
+        self.attitude_controller.set_attitude(roll-0.6, pitch, 0, 0.5)
+        #rospy.loginfo(f"pitch correction: {pitch}")
+        rospy.loginfo(f"roll correction: {roll-0.6}")
+
+        rospy.loginfo(f"DISTANCE: {distance}")
+        rospy.loginfo(f"ALTITUDE: {self.altitude}")
+        rospy.loginfo(f"ROLL: {self.x},")
+        rospy.loginfo(f"PITCH {self.y}")  """
+
     
     def perform_climb_maneuver(self):
         rospy.loginfo("Entering climb maneuver")
+        stop_service = rospy.ServiceProxy('stop_kamikaze', Empty)
+        response = stop_service()
+        
+        # Set mode to RTL
+        rospy.wait_for_service('/mavros/set_mode')
+        try:
+            set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
+            response = set_mode_srv(custom_mode='RTL')
+            if response.mode_sent:
+                rospy.loginfo("Mode set to RTL")
+            else:
+                rospy.logwarn("Failed to set mode to RTL")
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Service call failed: {e}")
+            return EmptyResponse()
 
         # Ensure all necessary data is available
         if self.vector is None:
@@ -296,60 +359,68 @@ class WaypointNode:
         if self.latitude is None or self.longitude is None or self.altitude is None:
             rospy.logwarn("Current position data is incomplete.")
             return
-
+    
         rospy.logwarn("perform climb manuever")
         # Define climb altitude and calculate the new target position
-        target_altitude = self.HOME_ALTITUDE + 50  # Example: climb to 50 meters above home altitude
-        distance_above = 1000  # This should be adjusted as needed
-        current_heading = math.radians(self.y)
-
-        # Compute new target coordinates
-        new_latitude = self.latitude + (distance_above * math.cos(current_heading) / 1e7)
-        new_longitude = self.longitude + (distance_above * math.sin(current_heading) / 1e7)
-
-        # Update climb waypoint
-        self.climb_waypoint['latitude'] = new_latitude
-        self.climb_waypoint['longitude'] = new_longitude
-        self.climb_waypoint['altitude'] = target_altitude
+        target_altitude = 100  # Example: climb to 50 meters above home altitude
 
         # Set attitude for climb maneuver
         yaw = self.y
         roll = 0.0
-        pitch = 20.0  # Adjust pitch for climb
+        pitch = -20.0  # Adjust pitch for climb
         thrust = 0.7  # Adjust thrust for climb
 
-        rospy.loginfo(f"Performing climb maneuver to new waypoint: ({new_latitude}, {new_longitude}, {target_altitude})")
-        
-        # Set attitude
-        self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
+        while self.altitude < target_altitude:
+            rospy.loginfo(f"Current altitude: {self.altitude}. Climbing to {target_altitude} meters.")
+            
+            self.attitude_controller.set_attitude(roll, pitch, yaw, thrust)
+            
+            rospy.sleep(1)  # Wait before checking altitude again
 
-        # Send the waypoint command
-        self.send_position_command(new_latitude, new_longitude, target_altitude)
-        
-        rospy.loginfo(f"Climb maneuver set to new altitude: {target_altitude} meters with thrust: {thrust}")
+        rospy.loginfo(f"Reached target altitude: {target_altitude} meters. Exiting climb maneuver.")
 
 
         
     def calculate_errors(self):
+        
+        if self.latitude is None or self.longitude is None:
+            rospy.logwarn("Latitude and longitude data are not available yet.")
+            return 0
+
+        current_roll = self.x
+        # Convert the current position and target position to ENU coordinates
+        """current_enu = pm.geodetic2enu(self.latitude, self.longitude, self.altitude, self.HOME_LATITUDE,  self.HOME_LONGITUDE, self.HOME_ALTITUDE)
+        target_enu = pm.geodetic2enu(self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE, self.HOME_LATITUDE,  self.HOME_LONGITUDE, self.HOME_ALTITUDE)
+        
+        # Calculate the vector difference between the current position and target position
+        vector_x = target_enu[0] - current_enu[0]
+        vector_y = target_enu[1] - current_enu[1]"""
+        
+        # Compute the target roll using atan2
+        target_roll = math.degrees(math.atan2(self.vector.y, self.vector.x))
+        roll_error = (target_roll - current_roll)
+        
+        
         # Ensure self.vector is not None
         if self.vector is None:
             rospy.logwarn("Vector data is not available yet.")
             return 0, 0
 
         # Calculate the roll error
-        current_roll = self.x
+        """
         target_roll = math.degrees(math.atan2(self.vector.y, self.vector.x))
-        roll_error = target_roll - current_roll
-        roll_error = ((roll_error + 180) % 360) - 180
-        rospy.loginfo(f"Roll error: {roll_error}")
+        roll_error = target_roll - current_roll"""
+        
 
         # Calculate the pitch error
         current_pitch = self.y
+        
+        target_altitude_for_pitch = self.PITCH_CORRECTION_ALTITUDE
+        altitude_difference = target_altitude_for_pitch - self.altitude
+        
         distance_2d = math.sqrt(self.vector.x**2 + self.vector.y**2)
-        target_pitch = math.degrees(math.atan2(self.vector.z, distance_2d))
+        target_pitch = math.degrees(math.atan2(altitude_difference, distance_2d))
         pitch_error = target_pitch - current_pitch
-        rospy.loginfo(f"Pitch error: {pitch_error}")
-
         return roll_error, pitch_error
   
     def set_mode(self, mode):

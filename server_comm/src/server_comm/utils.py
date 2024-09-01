@@ -3,6 +3,9 @@ from roslibpy import Message
 import json
 import math
 
+from datetime import datetime, timezone
+
+
 def calculate_speed(x, y, z):
     speed = math.sqrt(x**2 + y**2 + z**2)
     return speed
@@ -12,6 +15,21 @@ def mode_guided(mode):
         return 0
     else: 
         return 1
+
+    
+def unix_to_utc_formatted(unix_time, nsecs):
+    # Convert Unix epoch time to UTC datetime
+    utc_time = datetime.fromtimestamp(unix_time, tz=timezone.utc)
+    
+    # Format the UTC time to include day, hour, minute, second, and milliseconds
+    formatted_time = utc_time.strftime("%d:%H:%M:%S.%f")[:-3]
+    formatted_time = { "saat": int(utc_time.strftime("%H"))+3,
+                      "dakika": utc_time.strftime("%M"),
+                      "saniye": utc_time.strftime("%S"),
+                      "milisaniye": nsecs}
+
+    
+    return formatted_time
 
 
 def quaternion_to_euler(x, y, z, w):

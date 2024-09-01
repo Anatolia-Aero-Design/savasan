@@ -2,6 +2,8 @@ import math
 from scipy.spatial.transform import Rotation as R
 import tf.transformations as tf_trans
 from geometry_msgs.msg import Quaternion
+import rospy
+from mavros_msgs.srv import CommandLong
 
 def haversine_formula(latitude_1, longtitude_1, latitude_2, longtitude_2):
     R = 6371000 # Radius of the Earth in meters
@@ -20,139 +22,131 @@ def haversine_formula(latitude_1, longtitude_1, latitude_2, longtitude_2):
     return distance
 
 def euler_to_quaternion(roll, pitch, yaw):
-    quaternion = tf_trans.quaternion_from_euler(roll, pitch, yaw)
+    quaternion = tf_trans.quaternion_from_euler(math.radians(roll), math.radians(pitch), math.radians(yaw))
     return Quaternion(*quaternion)
 
-def quaternion_to_euler(x, y, z, w):
-    quat = [w, x, y, z]  # Quaternion sırası w, x, y, z
-    r = R.from_quat(quat)
-    euler = r.as_euler('zyx', degrees=True)  # Yaw, Pitch, Roll sırası
-    return euler[0], euler[1], euler[2]
+def quaternion_to_euler(w, x, y, z):
+    """
+    Convert a quaternion into Euler angles (roll, pitch, yaw).
+    Roll is rotation around x-axis (in degrees).
+    Pitch is rotation around y-axis (in degrees).
+    Yaw is rotation around z-axis (in degrees).
+    
+    :param w: Quaternion w component
+    :param x: Quaternion x component
+    :param y: Quaternion y component
+    :param z: Quaternion z component
+    :return: tuple (roll, pitch, yaw) in degrees
+    """
+    
+    # Roll (x-axis rotation)
+    sinr_cosp = 2 * (w * x + y * z)
+    cosr_cosp = 1 - 2 * (x * x + y * y)
+    roll = math.atan2(sinr_cosp, cosr_cosp)
+    
+    # Pitch (y-axis rotation)
+    sinp = 2 * (w * y - z * x)
+    if abs(sinp) >= 1:
+        # Use 90 degrees if out of range
+        pitch = math.copysign(math.pi / 2, sinp)
+    else:
+        pitch = math.asin(sinp)
+    
+    # Yaw (z-axis rotation)
+    siny_cosp = 2 * (w * z + x * y)
+    cosy_cosp = 1 - 2 * (y * y + z * z)
+    yaw = math.atan2(siny_cosp, cosy_cosp)
+    
+    # Convert radians to degrees
+    roll = math.degrees(roll)
+    pitch = math.degrees(pitch)
+    yaw = math.degrees(yaw)
+    
+    return roll, pitch, yaw
 
-def quaternion_to_euler_degrees(quaternion):
-    # Convert quaternion to Euler angles (roll, pitch, yaw) in radians
-    euler_angles_rad = tf_trans.euler_from_quaternion((quaternion.x, quaternion.y,quaternion.z,quaternion.w))
-    
-    # Convert Euler angles from radians to degrees
-    euler_angles_deg = [math.degrees(angle) for angle in euler_angles_rad]
-    
-    return euler_angles_deg
-
-def calculate_bearing(latitude_1, longitude_1, latitude_2, longitude_2):
-    latitude_1_rad = math.radians(latitude_1)
-    latitude_2_rad = math.radians(latitude_2)
-    longitude_1_rad = math.radians(longitude_1)
-    longitude_2_rad = math.radians(longitude_2)
-    
-    delta_long = longitude_2_rad - longitude_1_rad
-    
-    x = math.sin(delta_long) * math.cos(latitude_2_rad)
-    y = math.cos(latitude_1_rad) * math.sin(latitude_2_rad) - (math.sin(latitude_1_rad) * math.cos(latitude_2_rad) * math.cos(delta_long))
-    
-    bearing_rad = math.atan2(x, y)
-    bearing_deg = math.degrees(bearing_rad)
-    bearing_deg = (bearing_deg + 360) % 360  # Normalize to [0, 360)
-    
-    return bearing_deg
 
 
-def calculate_waypoint_sequance(target_lat, target_lon, target_alt, home_alt,
-                                   angle_degrees, distance1, distance2, distance3): # Calculate waypoints with the specified angle
-    R = 6371000  # Radius of the Earth in meters
-
+def gps_to_xyz(home_lat, home_lon, home_alt, target_lat, target_lon, target_alt):
+    """
+    Converts a GPS location to an XYZ coordinate system relative to a home location.
+    
+    :param home_lat: Latitude of the home location in degrees
+    :param home_lon: Longitude of the home location in degrees
+    :param home_alt: Altitude of the home location in meters
+    :param target_lat: Latitude of the target location in degrees
+    :param target_lon: Longitude of the target location in degrees
+    :param target_alt: Altitude of the target location in meters
+    :return: A tuple (x, y, z) representing the target location in XYZ coordinates relative to the home location
+    """
+    # Constants
+    earth_radius = 6378137.0  # Earth's radius in meters
+    
     # Convert latitude and longitude from degrees to radians
+    home_lat_rad = math.radians(home_lat)
+    home_lon_rad = math.radians(home_lon)
     target_lat_rad = math.radians(target_lat)
     target_lon_rad = math.radians(target_lon)
+    
+    # Calculate differences in latitude, longitude, and altitude
+    delta_lat = target_lat_rad - home_lat_rad
+    delta_lon = target_lon_rad - home_lon_rad
+    delta_alt = target_alt - home_alt
+    
+    # Calculate X and Y distances (East and North) in meters
+    delta_y = delta_lat * earth_radius  # North direction (Y axis)
+    delta_x = delta_lon * earth_radius * math.cos(home_lat_rad)  # East direction (X axis)
+    
+    # Z coordinate is simply the difference in altitude
+    delta_z = delta_alt
+    
+    return delta_x, delta_y, delta_z
 
-    # Calculate the waypoints
-    wp1_lat_rad = math.asin(math.sin(target_lat_rad) * math.cos((2 * distance1) / R) +
-                            math.cos(target_lat_rad) * math.sin((2 * distance1) / R) * math.cos(math.radians(angle_degrees)))
-    wp1_lon_rad = target_lon_rad + math.atan2(math.sin(math.radians(angle_degrees)) * math.sin((2 * distance1) / R) * math.cos(target_lat_rad),
-                            math.cos((2 * distance1) / R) - math.sin(target_lat_rad) * math.sin(wp1_lat_rad))
 
-    wp2_lat_rad = math.asin(math.sin(target_lat_rad) * math.cos(distance2 / R) +
-                            math.cos(target_lat_rad) * math.sin(distance2 / R) * math.cos(math.radians(angle_degrees)))
-    wp2_lon_rad = target_lon_rad + math.atan2(math.sin(math.radians(angle_degrees)) * math.sin(distance2 / R) * math.cos(target_lat_rad),
-                            math.cos(distance2 / R) - math.sin(target_lat_rad) * math.sin(wp2_lat_rad))
+def send_command_long(target_system, target_component, command, confirmation, param1, param2, param3, param4, param5, param6, param7):
+    """
+    Send a COMMAND_LONG MAVLink message via MAVROS.
 
-    wp4_lat_rad = math.asin(math.sin(target_lat_rad) * math.cos(distance3 / R) +
-                            math.cos(target_lat_rad) * math.sin(distance3 / R) * math.cos(math.radians(angle_degrees + 180)))
-    wp4_lon_rad = target_lon_rad + math.atan2(math.cos(math.radians(angle_degrees + 90)) * math.sin(distance3 / R) * math.cos(target_lat_rad),
-                            math.cos(distance3 / R) - math.sin(target_lat_rad) * math.sin(wp4_lat_rad))
+    :param target_system: Target system (e.g., drone) ID
+    :param target_component: Target component ID (e.g., autopilot)
+    :param command: MAVLink command ID
+    :param confirmation: 0: First transmission of this command, 1-255: Confirmation transmissions (e.g. for kill command)
+    :param param1 to param7: Command parameters (use 0 if not needed)
+    :return: Success status and result of the command
+    """
 
-    return [
-        (math.degrees(wp1_lat_rad), math.degrees(wp1_lon_rad), home_alt),
-        (math.degrees(wp2_lat_rad), math.degrees(wp2_lon_rad), home_alt),
-        (target_lat, target_lon, target_alt),
-        (math.degrees(wp4_lat_rad), math.degrees(wp4_lon_rad), home_alt)
-    ]
-    
-def calculate_waypoint(latitude, longitude, distance, bearing):
-    R = 6371000  # Radius of the Earth in meters
+    # Wait for the service to be available
+    rospy.wait_for_service('/mavros/cmd/command')
 
-    # Convert latitude and longitude from degrees to radians
-    latitude_rad = math.radians(latitude)
-    longitude_rad = math.radians(longitude)
-    bearing_rad = math.radians(bearing)
+    try:
+        # Create a service proxy for the command_long service
+        command_long_service = rospy.ServiceProxy('/mavros/cmd/command', CommandLong)
 
-    # Calculate the destination latitude
-    latitude_dest_rad = math.asin(
-        math.sin(latitude_rad) * math.cos(distance / R) +
-        math.cos(latitude_rad) * math.sin(distance / R) * math.cos(bearing_rad)
-    )
+        # Call the service
+        response = command_long_service(target_system,
+                                        target_component,
+                                        command,
+                                        confirmation,
+                                        param1,
+                                        param2,
+                                        param3,
+                                        param4,
+                                        param5,
+                                        param6,
+                                        param7)
 
-    # Calculate the destination longitude
-    longitude_dest_rad = longitude_rad + math.atan2(
-        math.sin(bearing_rad) * math.sin(distance / R) * math.cos(latitude_rad),
-        math.cos(distance / R) - math.sin(latitude_rad) * math.sin(latitude_dest_rad)
-    )
+        # Check the response and return the result
+        if response.success:
+            rospy.loginfo(f"Command {command} sent successfully with result {response.result}")
+        else:
+            rospy.logwarn(f"Failed to send command {command} with result {response.result}")
 
-    # Convert the destination latitude and longitude back to degrees
-    latitude_dest = math.degrees(latitude_dest_rad)
-    longitude_dest = math.degrees(longitude_dest_rad)
+        return response.success, response.result
 
-    return latitude_dest, longitude_dest
+    except rospy.ServiceException as e:
+        rospy.logerr(f"Service call failed: {e}")
+        return False, None
 
-def vector_angle(a, b):
-    # Calculate the dot product of vectors a and b
-    dot_product = sum(a[i] * b[i] for i in range(len(a)))
-    
-    # Calculate the magnitudes of vectors a and b
-    mag_a = math.sqrt(sum(a[i] ** 2 for i in range(len(a))))
-    mag_b = math.sqrt(sum(b[i] ** 2 for i in range(len(b))))
-    
-    # Calculate the cosine of the angle
-    cos_theta = dot_product / (mag_a * mag_b)
-    
-    # Handle floating point precision issues
-    cos_theta = max(-1.0, min(1.0, cos_theta))
-    
-    # Calculate the angle in radians
-    angle_rad = math.acos(cos_theta)
-    
-    # Convert the angle to degrees
-    angle_deg = math.degrees(angle_rad)
-    
-    return angle_deg
 
-def vector_angle_2d(a, b):
-    # Calculate the dot product of vectors a and b
-    dot_product = a[0] * b[0] + a[1] * b[1]
-    
-    # Calculate the magnitudes of vectors a and b
-    mag_a = math.sqrt(a[0] ** 2 + a[1] ** 2)
-    mag_b = math.sqrt(b[0] ** 2 + b[1] ** 2)
-    
-    # Calculate the cosine of the angle
-    cos_theta = dot_product / (mag_a * mag_b)
-    
-    # Handle floating point precision issues
-    cos_theta = max(-1.0, min(1.0, cos_theta))
-    
-    # Calculate the angle in radians
-    angle_rad = math.acos(cos_theta)
-    
-    # Convert the angle to degrees
-    angle_deg = math.degrees(angle_rad)
-    
-    return angle_deg
+
+
+

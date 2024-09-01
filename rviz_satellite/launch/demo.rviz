@@ -4,6 +4,10 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Global Options1
+        - /Status1
+        - /AerialMapDisplay1
+        - /TF1
         - /TF1/Tree1
         - /Marker1
       Splitter Ratio: 0.5
@@ -133,6 +137,9 @@ Visualization Manager:
   Tools:
     - Class: rviz/Interact
       Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
     - Class: rviz/Select
     - Class: rviz/Measure
     - Class: rviz/SetInitialPose
