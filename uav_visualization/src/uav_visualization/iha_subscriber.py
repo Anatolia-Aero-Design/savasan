@@ -16,8 +16,10 @@ f = 1 / 298.257223563 # Flattening
 e2 = 2*f - f**2  
 
 def geodetic_to_enu(lat, lon, alt):
-    lat_ref = -35.3632622
-    lon_ref = 149.1652375
+
+    lat_ref =  36.93824690
+    lon_ref = 35.52944677
+
     alt_ref = 0
     # Convert degrees to radians
     lat_ref = np.deg2rad(lat_ref)
@@ -65,6 +67,8 @@ def callback(data: KonumBilgileri):
             continue
         marker = create_marker(iha)
         marker_array.markers.append(marker)
+
+
 
     # Assign unique IDs to each marker in the array
     for i, marker in enumerate(marker_array.markers):
