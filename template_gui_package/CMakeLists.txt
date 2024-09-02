@@ -79,6 +79,7 @@ endforeach(DEPEND)
 ###
 find_package(catkin REQUIRED COMPONENTS ${ROS_DEPENDS}
     std_srvs
+    mavros_msgs
     )
 
 catkin_package(
@@ -88,6 +89,7 @@ catkin_package(
     ${PROJECT_NAME}
   CATKIN_DEPENDS
     ${ROS_DEPENDS}
+    mavros_msgs  # Add mavros_msgs to the existing dependencies
   DEPENDS
     ${EXTERNAL_DEPENDS}
 )
@@ -171,4 +173,3 @@ install(TARGETS ${NODE_LIST}
 install(DIRECTORY launch/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
   )
-
