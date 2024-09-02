@@ -10,7 +10,7 @@ conn:
   heartbeat_rate: 1.0    # send heartbeat rate in Hertz
   heartbeat_mav_type: "ONBOARD_CONTROLLER"
   timeout: 10.0          # heartbeat timeout in seconds
-  timesync_rate: 0    # TIMESYNC rate in Hertz (feature disabled if 0.0)
+  timesync_rate: 10.0    # TIMESYNC rate in Hertz (feature disabled if 0.0)
   system_time_rate: 1.0  # send system time to FCU rate in Hertz (disabled if 0.0)
 
 # sys_status
@@ -38,6 +38,11 @@ tdr_radio:
 cmd:
   use_comp_id_system_control: false # quirk for some old FCUs
 
+# dummy
+# None
+
+# ftp
+# None
 
 # global_position
 global_position:
@@ -90,3 +95,36 @@ mission:
   use_mission_item_int: true # use the MISSION_ITEM_INT message instead of MISSION_ITEM
                              # for uploading waypoints to FCU
                              
+# --- mavros extras plugins (same order) ---
+
+# adsb
+# None
+
+# debug_value
+# None
+
+# distance_sensor
+## Currently available orientations:
+#    Check http://wiki.ros.org/mavros/Enumerations
+##
+
+# mocap_pose_estimate
+mocap:
+  # select mocap source
+  use_tf: false   # ~mocap/tf
+  use_pose: true  # ~mocap/pose
+
+# mount_control
+mount:
+  debounce_s: 4.0
+  err_threshold_deg: 10.0
+  negate_measured_roll: false
+  negate_measured_pitch: false
+  negate_measured_yaw: false
+
+# odom
+odometry:
+  frame_tf:
+    desired_frame: "ned"
+  estimator_type: 3 # check enum MAV_ESTIMATOR_TYPE in <https://mavlink.io/en/messages/common.html>
+

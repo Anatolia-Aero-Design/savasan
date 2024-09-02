@@ -25,26 +25,31 @@ def camera_publisher():
             fps = 30
             rospy.logwarn("Unable to fetch FPS from camera, setting default FPS to 30")
         
-        rospy.loginfo(f"Camera FPS: {fps}")
-        rate = rospy.Rate(fps)  # Set the ROS rate to match the camera FPS
-        
-        while not rospy.is_shutdown():
-            ret, frame = cap.read()
-            if not ret:
-                rospy.logerr("Cannot read frame")
-                break
+    cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+    
 
-            try:
-                ros_image = bridge.cv2_to_imgmsg(frame, "bgr8")
-                ros_image.header.stamp = rospy.Time.now()
-                pub.publish(ros_image)
-            except CvBridgeError as e:
-                rospy.logerr(f"CvBridge Error: {e}")
+    if not cap.isOpened():
+        rospy.logerr("Cannot open GStreamer pipeline")
+        return
 
-            rate.sleep()
-        else:
+    rate = rospy.Rate(120)  # Set the ROS rate to match the camera FPS
+    
+    while not rospy.is_shutdown():
+        ret, frame = cap.read()
+        if not ret:
+            rospy.logerr("Cannot read frame")
             break
-        cap.release()
+
+        try:
+            ros_image = bridge.cv2_to_imgmsg(frame, "bgr8")
+            ros_image.header.stamp = rospy.Time.now()
+            pub.publish(ros_image)
+        except CvBridgeError as e:
+            rospy.logerr(f"CvBridge Error: {e}")
+
+        rate.sleep()
+
+    cap.release()
 
 if __name__ == '__main__':
     try:
