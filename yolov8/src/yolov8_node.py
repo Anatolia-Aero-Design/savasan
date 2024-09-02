@@ -11,28 +11,12 @@ import cv2
 import time
 import math
 import numpy as np
-
-class PID:
-	def __init__(self, Kp, Ki, Kd, setpoint=0):
-		self.Kp = Kp
-		self.Ki = Ki
-		self.Kd = Kd
-		self.setpoint = setpoint
-		self.previous_error = 0
-		self.integral = 0
-
-	def update(self, current_value):
-		error = self.setpoint - current_value
-		self.integral += error
-		derivative = error - self.previous_error
-		output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
-		self.previous_error = error
-		return output
+from PID import *
 
 class YOLOv8TrackingNode:
 	def __init__(self):
+		self.prev_time = rospy.get_time()
 		self.bridge = CvBridge()
-		self.bridge2 = CvBridge()
 		self.image_sub = None  # Subscriber will be created in start_tracking
   
 		self.imu_sub = rospy.Subscriber('/mavros/imu/data', Imu)
@@ -47,9 +31,9 @@ class YOLOv8TrackingNode:
 		self.xyxy = Yolo_xywh()
 
 		# PID controllers for yaw, pitch, and roll
-		self.yaw_pid = PID(Kp=1.0, Ki=0.0, Kd=0.1)
-		self.pitch_pid = PID(Kp=1.0, Ki=0.0, Kd=0.1)
-		self.roll_pid = PID(Kp=1.0, Ki=0.0, Kd=0.1)
+		self.yaw_pid = PID(Kp=1.0, Ki=0.01, Kd=0.1)
+		self.pitch_pid = PID(Kp=1.0, Ki=0.01, Kd=0.1)
+		self.roll_pid = PID(Kp=1.0, Ki=0.01, Kd=0.1)
 
 		# Image window name
 		self.window_name = 'YOLOv8 Tracking'
@@ -103,12 +87,13 @@ class YOLOv8TrackingNode:
 		t4 = time.time()
 		print(t4 - t3)
 
-		yaw, pitch, roll = self.calculate_yaw_pitch_roll(frame, self.xyxy, frame.shape)
+		current_time = rospy.get_time()
+		dt = current_time - self.prev_time
+		self.prev_time = current_time
+
+		yaw, pitch, roll = calculate_yaw_pitch_roll(frame, self.xyxy, frame.shape)
 		
-		# Calculate control outputs using PID controllers
-		self.yaw_pid.update(yaw)
-		self.pitch_pid.update(pitch)
-		self.roll_pid.update(roll)
+		roll, pitch = self.perform_correction(yaw, pitch, dt)
 
 		# Draw yaw, pitch, and roll values on the image
 		self.draw_yaw_pitch_roll_text(frame, yaw, pitch, roll)
@@ -118,7 +103,7 @@ class YOLOv8TrackingNode:
 		cv2.waitKey(1)
 
 		self.bbox_pub.publish(self.xyxy)
-
+  
 	def calculate_yaw_pitch_roll(self, image ,bounding_box, image_shape):
 		img_height, img_width = image_shape[:2]
 
@@ -162,6 +147,23 @@ class YOLOv8TrackingNode:
 			cv2.arrowedLine(image, (center_target_x, center_target_y), (center_x, center_y), (0, 0, 255), 2)
 			cv2.rectangle(image, (target_box_x, target_box_y), (target_box_w, target_box_h), (0, 255, 0), 2)
 		return yaw, pitch, roll
+
+	def perform_correction(self, yaw_error, pitch_error, dt):
+		"""Perform correction based on error."""
+
+		roll_correction = self.yaw_pid.compute(yaw_error, dt)
+		pitch_correction = self.pitch_pid.compute(pitch_error, dt)
+
+		roll_correction = max(min(roll_correction, 20), -20)
+		pitch_correction = max(min(pitch_correction, 25), -70)
+
+		pitch = pitch_correction
+		roll = roll_correction
+
+		#self.attitude_controller.set_attitude(roll, pitch, 0, 0)
+		#rospy.loginfo(f"roll correction: {roll_correction},")
+		#rospy.loginfo(f"pitch correction: {-pitch_correction},")
+		return roll, pitch
 
 	def send_attitude(self, yaw, pitch, roll):
 		attitude = AttitudeTarget()

@@ -15,12 +15,20 @@ class Waypoint_node:
         self.HOME_LATITUDE = 39.819850
         self.HOME_LONGITUDE = 30.534169
         self.HOME_ALTITUDE = 100
-
-        self.ROAD_DISTANCE = 300  
         
         self.TARGET_LATITUDE = 39.82006598
         self.TARGET_LONGITUDE = 30.53404039
         self.TARGET_ALTITUDE = 20
+        
+        # Get parameters from GUI // param name will be inserted here from GUI
+        '''try:
+            self.azimuth_degree = rospy.get_param('Lorem_Ipsum') 
+            self.dive_angle = rospy.get_param('Lorem_Ipsum') 
+            self.distance_of_approach = rospy.get_param('Lorem_Ipsum') 
+            self.offset = rospy.get_param('Lorem_Ipsum') 
+        except KeyError as e:
+            rospy.logerr(f"Parameter not found!: {e}")'''
+        
         self.uav_pose_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.uav_pose_callback)
         
         self.start_service = rospy.Service('start_waypoint', Empty, self.waypoints)
@@ -63,7 +71,7 @@ class Waypoint_node:
 
         calculated_waypoints = utils.calculate_waypoint_sequence(self.uav_position[0],self.uav_position[1], self.uav_position[2],
                                                                  self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE, 
-                                                                 70, 100, 60, 100)
+                                                                 self.azimuth_degree, self.distance_of_approach, self.dive_angle, 100)
        # first two wp calculations are wrong
         
         wp2 = Waypoint()

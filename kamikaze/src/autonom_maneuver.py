@@ -304,10 +304,10 @@ class Autonom_Maneuver_Node:
         pitch = pitch_correction
         roll = roll_correction
 
-        self.attitude_controller.set_attitude(0, pitch, 0, 0)
+        self.attitude_controller.set_attitude(roll, pitch, 0, 0)
         #rospy.loginfo(f"roll correction: {roll_correction},")
         #rospy.loginfo(f"pitch correction: {-pitch_correction},")
-        return roll
+        return roll, pitch
 
     def perform_climb_maneuver(self):
         rospy.loginfo("Entering climb maneuver")

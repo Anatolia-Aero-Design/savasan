@@ -37,7 +37,7 @@ class ImageProcessorNode:
         self.bbox_y = msg.y
         self.bbox_w = msg.w
         self.bbox_h = msg.h
-        rospy.loginfo(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
+        #rospy.loginfo(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
     
     def server_time_callback(self, msg):
         self.server_time = msg.data
@@ -55,8 +55,9 @@ class ImageProcessorNode:
         target_box_y = int(720 * 0.1)
         target_box_w = int(1280 * 0.75)
         target_box_h = int(720 * 0.9)
-        target_coordinates = target_box_x, target_box_y, target_box_w, target_box_h
+        target_box_coordinates = target_box_x, target_box_y, target_box_w, target_box_h
         cv2.rectangle(frame, (target_box_x, target_box_y), (target_box_w, target_box_h), (0, 255, 0), 2) 
+        self.overlay_server_time(frame)
         
         if self.bbox is not None:
         # Draw bounding box
@@ -64,12 +65,10 @@ class ImageProcessorNode:
             if bbox_x != 0 or bbox_y != 0 or bbox_w != 0 or bbox_h != 0:
                 cv2.rectangle(frame, (bbox_x, bbox_y), (bbox_w, bbox_h), (0, 0, 255), 2) # Updated to draw correctly
                 bbox_coordinates = bbox_x, bbox_y, bbox_w, bbox_h
-                proportions = self.calculate_lock_on_proportion(target_coordinates, bbox_coordinates)
+                proportions = self.calculate_lock_on_proportion(target_box_coordinates, bbox_coordinates)
                 lock_on_status, kilit = self.lock_on_status(proportions, frame)
                 self.lock_on_pub.publish(lock_on_status)
                 self.kilit_pub.publish(kilit)
-                
-        self.overlay_server_time(frame)
 
         try:
             # Convert OpenCV image back to ROS Image message

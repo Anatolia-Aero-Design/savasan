@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 4.9.2, 2022-03-22T13:57:31. -->
+<!-- Written by QtCreator 4.9.2, 2024-09-02T13:28:34. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
-  <value type="QByteArray">{7cc06e57-21d6-4347-b2be-7f362130cb4c}</value>
+  <value type="QByteArray">{3349631b-7f0c-43d4-a341-41efa78c4337}</value>
  </data>
  <data>
   <variable>ProjectExplorer.Project.ActiveTarget</variable>
@@ -19,7 +19,7 @@
    <valuemap type="QVariantMap" key="EditorConfiguration.CodeStyle.0">
     <value type="QString" key="language">Cpp</value>
     <valuemap type="QVariantMap" key="value">
-     <value type="QByteArray" key="CurrentPreferences">ROSProject.CppCodeStyle</value>
+     <value type="QByteArray" key="CurrentPreferences">CppGlobal</value>
     </valuemap>
    </valuemap>
    <valuemap type="QVariantMap" key="EditorConfiguration.CodeStyle.1">
@@ -64,7 +64,7 @@
   <valuemap type="QVariantMap">
    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">Desktop</value>
    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">Desktop</value>
-   <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">{ac90f24e-0716-4d1d-81e7-e8e03cb5fb29}</value>
+   <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">{5ecf6dd7-dbbc-46ce-a62f-00cdcc4d4d9f}</value>
    <value type="int" key="ProjectExplorer.Target.ActiveBuildConfiguration">0</value>
    <value type="int" key="ProjectExplorer.Target.ActiveDeployConfiguration">0</value>
    <value type="int" key="ProjectExplorer.Target.ActiveRunConfiguration">0</value>
@@ -107,9 +107,9 @@
     <valuelist type="QVariantList" key="ProjectExplorer.BuildConfiguration.UserEnvironmentChanges">
      <value type="QString">CMAKE_PREFIX_PATH=/opt/ros/noetic</value>
      <value type="QString">LD_LIBRARY_PATH=/opt/ros/noetic/lib</value>
-     <value type="QString">PATH=/opt/ros/noetic/bin:/home/kris/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin</value>
+     <value type="QString">PATH=/opt/ros/noetic/bin:/usr/lib/ccache:/home/valvarn/ardupilot/Tools/autotest:/opt/gcc-arm-none-eabi-10-2020-q4-major/bin:/home/valvarn/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin</value>
      <value type="QString">PKG_CONFIG_PATH=/opt/ros/noetic/lib/pkgconfig</value>
-     <value type="QString">PWD=/home/kris/ros/testing_ws/src/template_gui_package</value>
+     <value type="QString">PWD=/home/valvarn/catkin_ws/src/savasan/template_gui_package</value>
      <value type="QString">PYTHONPATH=/opt/ros/noetic/lib/python3/dist-packages</value>
      <value type="QString">ROSLISP_PACKAGE_DIRECTORIES=</value>
      <value type="QString">ROS_DISTRO=noetic</value>

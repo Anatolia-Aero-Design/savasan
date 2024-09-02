@@ -13,9 +13,8 @@ class VideoSaveNode:
         self.bridge = CvBridge()
 
         # Subscribers using message_filters for synchronization
-        kamikaze_sub = rospy.Subscriber("camera/kamikaze_image", Image, self.callback)
         tracking_sub = rospy.Subscriber("/camera/image_processed", Image, self.callback)
-        
+           
         competition_no = 1 # Will be set accordingly during each round of competition
         current_time = time.localtime()
         file_name = f"{competition_no}_Anatolia_Aero_Design_{current_time.tm_mday}_0{current_time.tm_mon}_{current_time.tm_year}.avi"

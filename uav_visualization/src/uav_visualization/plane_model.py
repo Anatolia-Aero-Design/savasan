@@ -20,13 +20,13 @@ class PoseToMarker:
         self.marker.header.frame_id = "map"  # Set the frame id to match your coordinate frame
         self.marker.type = Marker.MESH_RESOURCE      # Set the marker type; ARROW is common for representing poses
         self.marker.action = Marker.ADD
-        self.marker.mesh_resource = "package://kamikaze/models/fixed_wing_plane_v2.dae"
+        self.marker.mesh_resource = "package://kamikaze/models/shadow_mokab.dae"
 
 
         # Set some default marker properties
-        self.marker.scale.x = 10  # Arrow length
-        self.marker.scale.y = 10  # Arrow width
-        self.marker.scale.z = 10  # Arrow height
+        self.marker.scale.x = 1  # Arrow length
+        self.marker.scale.y = 1  # Arrow width
+        self.marker.scale.z = 1  # Arrow height
         self.marker.color.a = 1.0  # Alpha (transparency)
         self.marker.color.r = 1.0  # Red
         self.marker.color.g = 0.0  # Green

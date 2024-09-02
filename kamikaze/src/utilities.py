@@ -66,6 +66,40 @@ def quaternion_to_euler_degrees(quaternion):
     euler_angles_deg = [math.degrees(angle) for angle in euler_angles_rad]
     return euler_angles_deg
 
+def gps_to_xyz(home_lat, home_lon, home_alt, target_lat, target_lon, target_alt):
+    """
+    Converts a GPS location to an XYZ coordinate system relative to a home location.
+    
+    :param home_lat: Latitude of the home location in degrees
+    :param home_lon: Longitude of the home location in degrees
+    :param home_alt: Altitude of the home location in meters
+    :param target_lat: Latitude of the target location in degrees
+    :param target_lon: Longitude of the target location in degrees
+    :param target_alt: Altitude of the target location in meters
+    :return: A tuple (x, y, z) representing the target location in XYZ coordinates relative to the home location
+    """
+    # Constants
+    earth_radius = 6378137.0  # Earth's radius in meters
+    
+    # Convert latitude and longitude from degrees to radians
+    home_lat_rad = math.radians(home_lat)
+    home_lon_rad = math.radians(home_lon)
+    target_lat_rad = math.radians(target_lat)
+    target_lon_rad = math.radians(target_lon)
+    
+    # Calculate differences in latitude, longitude, and altitude
+    delta_lat = target_lat_rad - home_lat_rad
+    delta_lon = target_lon_rad - home_lon_rad
+    delta_alt = target_alt - home_alt
+    
+    # Calculate X and Y distances (East and North) in meters
+    delta_y = delta_lat * earth_radius  # North direction (Y axis)
+    delta_x = delta_lon * earth_radius * math.cos(home_lat_rad)  # East direction (X axis)
+    
+    # Z coordinate is simply the difference in altitude
+    delta_z = delta_alt
+    
+    return delta_x, delta_y, delta_z
 
 def calculate_waypoint_sequence(current_lat, current_lon, current_alt, target_lat, target_lon, 
                                 target_alt, azimuth_angle, distance_1_2, dive_angle, distance_leave):

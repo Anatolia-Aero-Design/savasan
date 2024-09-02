@@ -87,7 +87,7 @@ class Comm_Node:
 
 
         # Configure logging
-        logging.basicConfig(filename='/home/poyrazzo/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
       
     def fcu_time_callback(self, msg):
         self.fcu_time = msg.time_ref.secs
@@ -112,8 +112,6 @@ class Comm_Node:
     def kilit_callback(self, msg):
         self.kilit = msg.data
         rospy.loginfo(f"Received kilit: {msg.data}")
-
-
         self.process_data()
 
         self.lock_on_thread = threading.Thread(target=self.send_lock_on_info)
@@ -176,7 +174,6 @@ class Comm_Node:
         logging.info(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
         self.process_data()
 
-        
     def login(self):
         url = f"{self.base_url}/giris"
         headers = {
@@ -281,21 +278,17 @@ class Comm_Node:
         now = datetime.now()
         return now.hour, now.minute, now.second, now.microsecond
         
-    def send_lock_on_info(self):
-        while not rospy.is_shutdown():
-            if self.kilit is None and self.kilit_prev is None:
+    def send_lock_on_info(self, kilit_msg, lock_on_msg): 
+        while True:
+            if kilit_msg is None and self.kilit_prev is None:
                 pass
-
-            elif self.kilit_prev is None and self.kilit is not None:
-                self.kilit_prev = self.kilit
-
-            elif self.kilit_prev is True and self.kilit is True or self.kilit_prev is False and self.kilit is True:
+            elif self.kilit_prev is None and kilit_msg is not None:
+                self.kilit_prev = kilit_msg
+            elif self.kilit_prev is True and kilit_msg is True or self.kilit_prev is False and kilit_msg is True:
                 self.start_time = self.get_current_time()
-
-            elif self.kilit_prev is True and self.kilit is False and self.lock_on is True:
+            elif self.kilit_prev is True and kilit_msg is False and lock_on_msg is True:
                 self.end_time = self.get_current_time()
-
-                if self.lock_on:
+                if lock_on_msg:
                     try:
                         data_dict = {
                             "kilitlenmeBaslangicZamani": {
@@ -312,24 +305,15 @@ class Comm_Node:
                             },
                             "otonom_kilitlenme": 1
                         }
-  
-                        print("Lock-on Info Dictionary:")
-                        print(json.dumps(data_dict, indent=4))
-
-
                         response = self.session.post(self.server_url_kilitlenme_bilgisi, json=data_dict)
-
                         if response.status_code == 200:
                             logging.info(f"Lock-on data sent successfully: {response.json()}")
                         else:
                             logging.error(f"Failed to send lock-on data, status code: {response.status_code}")
-
                     except Exception as e:
                         logging.error(f"An error occurred while sending lock-on data: {str(e)}")
-
-            self.kilit_prev = self.kilit  # Update previous status
-
-            time.sleep(0.1),
+            self.kilit_prev = kilit_msg  # Update previous status
+            time.sleep(0.1)
             
     def publish_qr(self):
             while not rospy.is_shutdown():
@@ -377,7 +361,6 @@ class Comm_Node:
                         rospy.logerr("Failed to retrieve start or end time from ROS parameters.")
             else:
                 rospy.loginfo("no qr_data available")
-
 
     def get_server_time(self):
         try:

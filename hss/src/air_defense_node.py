@@ -65,6 +65,7 @@ class Air_Defense_Node:
         try:
             self.parse_coordinates()
             self.write_mission_to_file()
+            self.take_action_RTL()
             self.send_command(CommandCode.DO_FENCE_ENABLE, 1)
             rospy.loginfo("Geofences enabled!")
             return EmptyResponse()
