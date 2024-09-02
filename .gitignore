@@ -2,3 +2,6 @@
 /image_handler/files/chase.mp4
 /yolov8/model/best_x.pt
 /image_handler/files/DSCF1821_2.mp4
+kamikaze/src/__pycache__/QR_node.cpython-38.pyc
+server_comm/src/server_comm/__pycache__/utils.cpython-38.pyc
+kamikaze/src/__pycache__/utilities.cpython-38.pyc

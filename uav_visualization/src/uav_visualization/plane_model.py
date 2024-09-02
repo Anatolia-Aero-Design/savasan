@@ -24,9 +24,10 @@ class PoseToMarker:
 
 
         # Set some default marker properties
-        self.marker.scale.x = 1  # Arrow length
-        self.marker.scale.y = 1  # Arrow width
-        self.marker.scale.z = 1  # Arrow height
+        
+        self.marker.scale.x = 10  # Arrow length
+        self.marker.scale.y = 10  # Arrow width
+        self.marker.scale.z = 10  # Arrow height
         self.marker.color.a = 1.0  # Alpha (transparency)
         self.marker.color.r = 101/255  # Red
         self.marker.color.g = 107/255  # Green
