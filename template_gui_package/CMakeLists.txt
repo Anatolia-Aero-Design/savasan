@@ -77,7 +77,9 @@ endforeach(DEPEND)
 ###
 ###  Add any required ros packages here
 ###
-find_package(catkin REQUIRED COMPONENTS ${ROS_DEPENDS})
+find_package(catkin REQUIRED COMPONENTS ${ROS_DEPENDS}
+    std_srvs
+    )
 
 catkin_package(
   INCLUDE_DIRS
