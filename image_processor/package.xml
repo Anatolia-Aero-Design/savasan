@@ -14,7 +14,6 @@
   <build_depend>cv_bridge</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>message_generation</build_depend>
-  <build_depend>server_comm</build_depend>
 
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>rospy</exec_depend>
@@ -22,7 +21,6 @@
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>message_runtime</exec_depend>
-  <exec_depend>server_comm</exec_depend>
 
   <export>
     <build_type>catkin</build_type>

@@ -24,22 +24,19 @@ from image_processor.msg import Yolo_xywh
 
 class Comm_Node:
     def __init__(self):
-
         self.session = requests.Session()
         self.base_url = 'http://savasaniha.baykartech.com/api'
         self.username = 'estuanatolia'
         self.password = '2Eqtm3v3ZJ'
         self.team_number = None
-
+        
         # Get server APIs from sim.launch params
         self.server_url_telemetri_gonder = rospy.get_param('/comm_node/api/telemetri_gonder')
         self.server_url_kilitlenme_bilgisi = rospy.get_param('/comm_node/api/kilitlenme_bilgisi')
         self.server_url_sunucusaati = rospy.get_param('/comm_node/api/sunucusaati')
-
         self.server_url_kamikaze_bilgisi = rospy.get_param('/comm_node/api/kamikaze_bilgisi')
         
         self.abort_service = rospy.Service('stop_kamikaze', Empty, self.qr_check)
-
 
         self.imu = None
         self.battery = None
@@ -63,7 +60,6 @@ class Comm_Node:
         self.start_time = None
         self.end_time = None
         self.kilit_prev = None
-
         try:
             # Initialize Subscribers
             self.imu_sub = rospy.Subscriber('/mavros/imu/data', Imu, self.imu_callback)
@@ -75,10 +71,8 @@ class Comm_Node:
             self.lock_on_sub = rospy.Subscriber('/lock_on_status', Bool, self.lock_on_callback)
             self.kilit_sub = rospy.Subscriber('/kilit', Bool, self.kilit_callback)
             self.bbox_sub = rospy.Subscriber("/yolov8/xywh", Yolo_xywh, self.bbox_callback)
-
             self.qr_sub = rospy.Subscriber("/qr_code_data", String, self.qr_callback)
             self.fcu_time_sub = rospy.Subscriber("/mavros/time_reference", TimeReference, self.fcu_time_callback)
-
         
         except Exception as e:
             print("error")
@@ -93,7 +87,7 @@ class Comm_Node:
 
 
         # Configure logging
-        logging.basicConfig(filename='/home/poyrazzo/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
       
     def fcu_time_callback(self, msg):
         self.fcu_time = msg.time_ref.secs
@@ -118,8 +112,6 @@ class Comm_Node:
     def kilit_callback(self, msg):
         self.kilit = msg.data
         rospy.loginfo(f"Received kilit: {msg.data}")
-
-
         self.process_data()
 
         self.lock_on_thread = threading.Thread(target=self.send_lock_on_info)
@@ -148,8 +140,29 @@ class Comm_Node:
     def state_callback(self, msg):
         self.state = msg
         self.process_data()
-
     
+    def qr_check(self,req):
+        self.qr_published=False
+        
+    def qr_callback(self,msg):
+        if self.qr_published is False:  # Check if the QR data has already been published
+            self.qr_data = msg.data
+            self.publish_qr()
+        else:
+            rospy.loginfo("qr zaten okundu aga")
+
+    def lock_on_callback(self, msg):
+        self.lock_on = msg
+        self.process_data()
+
+    def kilit_callback(self, msg):
+        self.kilit = msg.data
+        rospy.loginfo(f"Received kilit: {msg.data}")
+        logging.info(f"Received kilit: {msg.data}")
+        self.process_data()
+
+        self.lock_on_thread = threading.Thread(target=self.send_lock_on_info(self.kilit, self.lock_on))
+        self.lock_on_thread.start()
 
     def bbox_callback(self, msg):
         self.bbox = msg
@@ -161,7 +174,6 @@ class Comm_Node:
         logging.info(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
         self.process_data()
 
-        
     def login(self):
         url = f"{self.base_url}/giris"
         headers = {
@@ -181,8 +193,7 @@ class Comm_Node:
             print(f"Failed to login. Status code: {response.status_code}")
             print("Response:", response.text)
         return response
-
-
+    
     def process_data(self):
         if not (self.imu and self.battery and self.rel_alt and self.position and self.speed and self.state):
             return
@@ -193,12 +204,9 @@ class Comm_Node:
             IHA_otonom = 0  # Set to 0 for manual modes
 
         iha_kilitlenme = 1 if self.kilit else 0
-
+        
         try:
-
             self.get_server_time()
-
-
             # Convert quaternion to euler angles
             roll, pitch, yaw = quaternion_to_euler(self.imu.orientation.x,
                                                    self.imu.orientation.y,
@@ -207,9 +215,7 @@ class Comm_Node:
 
             # Prepare data dictionary
             data_dict = {
-
                 "takim_numarasi": self.team_number,
-
                 "IHA_enlem": self.position.latitude,
                 "IHA_boylam": self.position.longitude,
                 "IHA_irtifa": self.rel_alt.data,
@@ -224,15 +230,12 @@ class Comm_Node:
                 "hedef_merkez_Y": self.bbox_y,
                 "hedef_genislik": self.bbox_w,
                 "hedef_yukseklik": self.bbox_h,
-
                 "gps_saati": unix_to_utc_formatted(self.fcu_time, self.fcu_time_nsecs)
             }
-            
             logging.info("Prepared data dictionary for server update.")
 
             # Send data to the server
             response = self.session.post(self.server_url_telemetri_gonder, json=data_dict)
-
             logging.info(f"Sent data to server: {data_dict}")
 
             # Check server response
@@ -241,7 +244,7 @@ class Comm_Node:
                 self.parse_and_publish_konumBilgileri(response.json())
             else:
                 logging.error(f"Failed to send data, status code: {response.status_code}")
-
+                            
         except Exception as e:
             logging.error(f"An error occurred in process_data: {str(e)}")
 
@@ -275,21 +278,17 @@ class Comm_Node:
         now = datetime.now()
         return now.hour, now.minute, now.second, now.microsecond
         
-    def send_lock_on_info(self):
-        while not rospy.is_shutdown():
-            if self.kilit is None and self.kilit_prev is None:
+    def send_lock_on_info(self, kilit_msg, lock_on_msg): 
+        while True:
+            if kilit_msg is None and self.kilit_prev is None:
                 pass
-
-            elif self.kilit_prev is None and self.kilit is not None:
-                self.kilit_prev = self.kilit
-
-            elif self.kilit_prev is True and self.kilit is True or self.kilit_prev is False and self.kilit is True:
+            elif self.kilit_prev is None and kilit_msg is not None:
+                self.kilit_prev = kilit_msg
+            elif self.kilit_prev is True and kilit_msg is True or self.kilit_prev is False and kilit_msg is True:
                 self.start_time = self.get_current_time()
-
-            elif self.kilit_prev is True and self.kilit is False and self.lock_on is True:
+            elif self.kilit_prev is True and kilit_msg is False and lock_on_msg is True:
                 self.end_time = self.get_current_time()
-
-                if self.lock_on:
+                if lock_on_msg:
                     try:
                         data_dict = {
                             "kilitlenmeBaslangicZamani": {
@@ -306,24 +305,15 @@ class Comm_Node:
                             },
                             "otonom_kilitlenme": 1
                         }
-  
-                        print("Lock-on Info Dictionary:")
-                        print(json.dumps(data_dict, indent=4))
-
-
                         response = self.session.post(self.server_url_kilitlenme_bilgisi, json=data_dict)
-
                         if response.status_code == 200:
                             logging.info(f"Lock-on data sent successfully: {response.json()}")
                         else:
                             logging.error(f"Failed to send lock-on data, status code: {response.status_code}")
-
                     except Exception as e:
                         logging.error(f"An error occurred while sending lock-on data: {str(e)}")
-
-            self.kilit_prev = self.kilit  # Update previous status
-
-            time.sleep(0.1),
+            self.kilit_prev = kilit_msg  # Update previous status
+            time.sleep(0.1)
             
     def publish_qr(self):
             while not rospy.is_shutdown():
@@ -372,26 +362,14 @@ class Comm_Node:
             else:
                 rospy.loginfo("no qr_data available")
 
-
     def get_server_time(self):
         try:
             response = self.session.get(self.server_url_sunucusaati, timeout=10)
             if response.status_code == 200:
                 server_time = response.json()
                 logging.info(f"Server time retrieved successfully: {server_time}")
-                formatted_time_dict = {
-                "gun": server_time["gun"],
-                "saat": server_time["saat"],
-                "dakika": server_time["dakika"],
-                "saniye": server_time["saniye"],
-                "milisaniye": server_time["milisaniye"]
-                }
-                formatted_time_str = json.dumps(formatted_time_dict)
-                self.server_time_pub.publish(formatted_time_str)
-                return formatted_time_dict
-                time_str = f"{server_time['gun']}:{server_time['saat']}:{server_time['dakika']}:{server_time['saniye']}:{server_time['milisaniye']}"
+                time_str = f"{server_time['saat']}:{server_time['dakika']}:{server_time['saniye']}:{server_time['milisaniye']}"
                 self.server_time_pub.publish(time_str)
-
                 return time_str
             else:
                 logging.error(f"Failed to retrieve server time, status code: {response.status_code}")
@@ -399,15 +377,11 @@ class Comm_Node:
         except Exception as e:
             logging.error(f"An error occurred while retrieving server time: {str(e)}")
             return None
-
-
-
+        
 if __name__ == '__main__':
-    rospy.init_node('comm_node', anonymous=True)
+    rospy.init_node('comm_node', anonymous=True)    
     comm_node = Comm_Node()
-
-    comm_node.login()
-
+    comm_node.login() # perform login
     try:
         rospy.spin()
     except rospy.ROSInterruptException:

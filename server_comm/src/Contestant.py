@@ -21,7 +21,6 @@ class Contestant():
         self.merkez_Y = json_data['hedef_merkez_Y']
         self.genislik = json_data['hedef_genislik']
         self.yukseklik = json_data['hedef_yukseklik']
-        self.sunucusaati = json_data['sunucusaati']
         time.sleep(1)
         
     def get_info(self):

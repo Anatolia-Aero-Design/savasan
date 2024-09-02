@@ -75,21 +75,6 @@ local_position:
     child_frame_id: "base_link"
     send_fcu: false
 
-# param
-# None, used for FCU params
-
-# rc_io
-# None
-
-# safety_area
-safety_area:
-  p1: {x:  1.0, y:  1.0, z:  1.0}
-  p2: {x: -1.0, y: -1.0, z: -1.0}
-
-# setpoint_accel
-setpoint_accel:
-  send_force: false
-
 # setpoint_attitude
 setpoint_attitude:
   reverse_thrust: false     # allow reversed thrust
@@ -103,30 +88,6 @@ setpoint_attitude:
 # setpoint_raw
 setpoint_raw:
   thrust_scaling: 1.0       # specify thrust scaling (normalized, 0 to 1) for thrust (like PX4)
-
-# setpoint_position
-setpoint_position:
-  tf:
-    listen: false           # enable tf listener (disable topic subscribers)
-    frame_id: "map"
-    child_frame_id: "target_position"
-    rate_limit: 50.0
-  mav_frame: LOCAL_NED
- 
-# guided_target
-guided_target:
-  tf:
-    listen: false           # enable tf listener (disable topic subscribers)
-    frame_id: "map"
-    child_frame_id: "target_position"
-    rate_limit: 50.0
-
-# setpoint_velocity
-setpoint_velocity:
-  mav_frame: LOCAL_NED
-
-# vfr_hud
-# None
 
 # waypoint
 mission:

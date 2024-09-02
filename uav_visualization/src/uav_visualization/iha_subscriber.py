@@ -62,7 +62,6 @@ transformer = Transformer.from_crs(wgs84, utm_zone33)
 def callback(data: KonumBilgileri):
     # Parsing the incoming message
     marker_array = MarkerArray()
-
     for iha in data.konumBilgileri:
         if iha.takim_numarasi == 31:
             continue
@@ -104,7 +103,6 @@ def create_marker(iha: KonumBilgisi):
     marker.color.a = 1.0
     marker.color.r = 0.0
     marker.color.g = 1.0
-
     marker.color.b = 0.0
 
     return marker
@@ -112,7 +110,6 @@ def create_marker(iha: KonumBilgisi):
 def listener():
     rospy.init_node('iha_subscriber', anonymous=True)
     rospy.Subscriber("/konum_bilgileri", KonumBilgileri, callback)
-
     rospy.spin()
 
 if __name__ == '__main__':
@@ -121,4 +118,3 @@ if __name__ == '__main__':
         listener()
     except rospy.ROSInterruptException:
         pass
-

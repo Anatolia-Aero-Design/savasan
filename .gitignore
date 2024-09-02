@@ -1,2 +1,4 @@
-/home/auki/catkin_ws/src/savasan/kamikaze/src/__pycache__
-/home/auki/catkin_ws/src/savasan/template_gui_package/build
+# Ignore specific files
+/image_handler/files/chase.mp4
+/yolov8/model/best_x.pt
+/image_handler/files/DSCF1821_2.mp4

@@ -1,70 +1,70 @@
 import math
 from scipy.spatial.transform import Rotation as R
 import tf.transformations as tf_trans
+import numpy as np
+import cv2
 from geometry_msgs.msg import Quaternion
-import rospy
-from mavros_msgs.srv import CommandLong
 
-def haversine_formula(latitude_1, longtitude_1, latitude_2, longtitude_2):
-    R = 6371000 # Radius of the Earth in meters
+# Constant for Earth's radius in meters
+EARTH_RADIUS = 6371000
+
+def haversine_formula(latitude_1, longitude_1, latitude_2, longitude_2):
+    """
+    Calculate the great-circle distance between two points on the Earth's surface.
+    """
     latitude_1_rad = math.radians(latitude_1)
     latitude_2_rad = math.radians(latitude_2)
     
-    longtitude_1_rad = math.radians(longtitude_1)
-    longtitude_2_rad = math.radians(longtitude_2)
+    longitude_1_rad = math.radians(longitude_1)
+    longitude_2_rad = math.radians(longitude_2)
     
     lat_difference = abs(latitude_1_rad - latitude_2_rad)
-    lon_difference = abs(longtitude_1_rad - longtitude_2_rad)
+    lon_difference = abs(longitude_1_rad - longitude_2_rad)
     
-    a = (math.sin(lat_difference/2))**2 + (math.cos(latitude_1_rad) * math.cos(latitude_2_rad) * (math.sin(lon_difference/2))**2)
+    a = (math.sin(lat_difference / 2)) ** 2 + (math.cos(latitude_1_rad) * math.cos(latitude_2_rad) * (math.sin(lon_difference / 2)) ** 2)
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    distance = R * c
+    distance = EARTH_RADIUS * c
     return distance
 
+def geodetic_to_cartesian(lat, lon, alt):
+    # WGS84 ellipsoid parameters
+    a = 6378137.0  # Semi-major axis in meters
+    e = 8.1819190842622e-2  # Eccentricity
+    
+    lat_rad = np.radians(lat)
+    lon_rad = np.radians(lon)
+    
+    N = a / np.sqrt(1 - e**2 * np.sin(lat_rad)**2)
+    
+    x = (N + alt) * np.cos(lat_rad) * np.cos(lon_rad)
+    y = (N + alt) * np.cos(lat_rad) * np.sin(lon_rad)
+    z = (N * (1 - e**2) + alt) * np.sin(lat_rad)
+    
+    return np.array([x, y, z])
+
 def euler_to_quaternion(roll, pitch, yaw):
+    """
+    Convert Euler angles to a quaternion.
+    """
     quaternion = tf_trans.quaternion_from_euler(math.radians(roll), math.radians(pitch), math.radians(yaw))
     return Quaternion(*quaternion)
 
-def quaternion_to_euler(w, x, y, z):
+def quaternion_to_euler(x, y, z, w):
     """
-    Convert a quaternion into Euler angles (roll, pitch, yaw).
-    Roll is rotation around x-axis (in degrees).
-    Pitch is rotation around y-axis (in degrees).
-    Yaw is rotation around z-axis (in degrees).
-    
-    :param w: Quaternion w component
-    :param x: Quaternion x component
-    :param y: Quaternion y component
-    :param z: Quaternion z component
-    :return: tuple (roll, pitch, yaw) in degrees
+    Convert a quaternion to Euler angles (yaw, pitch, roll) in degrees.
     """
-    
-    # Roll (x-axis rotation)
-    sinr_cosp = 2 * (w * x + y * z)
-    cosr_cosp = 1 - 2 * (x * x + y * y)
-    roll = math.atan2(sinr_cosp, cosr_cosp)
-    
-    # Pitch (y-axis rotation)
-    sinp = 2 * (w * y - z * x)
-    if abs(sinp) >= 1:
-        # Use 90 degrees if out of range
-        pitch = math.copysign(math.pi / 2, sinp)
-    else:
-        pitch = math.asin(sinp)
-    
-    # Yaw (z-axis rotation)
-    siny_cosp = 2 * (w * z + x * y)
-    cosy_cosp = 1 - 2 * (y * y + z * z)
-    yaw = math.atan2(siny_cosp, cosy_cosp)
-    
-    # Convert radians to degrees
-    roll = math.degrees(roll)
-    pitch = math.degrees(pitch)
-    yaw = math.degrees(yaw)
-    
-    return roll, pitch, yaw
+    quat = [w, x, y, z]  # Quaternion order w, x, y, z
+    r = R.from_quat(quat)
+    euler = r.as_euler('zyx', degrees=True)  # Order: yaw, pitch, roll
+    return euler[0], euler[1], euler[2]
 
-
+def quaternion_to_euler_degrees(quaternion):
+    """
+    Convert a quaternion to Euler angles (roll, pitch, yaw) in degrees.
+    """
+    euler_angles_rad = tf_trans.euler_from_quaternion((quaternion.x, quaternion.y, quaternion.z, quaternion.w))
+    euler_angles_deg = [math.degrees(angle) for angle in euler_angles_rad]
+    return euler_angles_deg
 
 def gps_to_xyz(home_lat, home_lon, home_alt, target_lat, target_lon, target_alt):
     """
@@ -101,52 +101,144 @@ def gps_to_xyz(home_lat, home_lon, home_alt, target_lat, target_lon, target_alt)
     
     return delta_x, delta_y, delta_z
 
-
-def send_command_long(target_system, target_component, command, confirmation, param1, param2, param3, param4, param5, param6, param7):
+def calculate_waypoint_sequence(current_lat, current_lon, current_alt, target_lat, target_lon, 
+                                target_alt, azimuth_angle, distance_1_2, dive_angle, distance_leave):
     """
-    Send a COMMAND_LONG MAVLink message via MAVROS.
+    Generate waypoints based on the given target location, azimuth angle, and distances for a dive maneuver.
 
-    :param target_system: Target system (e.g., drone) ID
-    :param target_component: Target component ID (e.g., autopilot)
-    :param command: MAVLink command ID
-    :param confirmation: 0: First transmission of this command, 1-255: Confirmation transmissions (e.g. for kill command)
-    :param param1 to param7: Command parameters (use 0 if not needed)
-    :return: Success status and result of the command
+    Args:
+    - current_lat (float): Current latitude of the plane (waypoint 2).
+    - current_lon (float): Current longitude of the plane (waypoint 2).
+    - current_alt (float): Current altitude of the plane (waypoint 2).
+    - target_lat (float): Latitude of the target location (waypoint 3).
+    - target_lon (float): Longitude of the target location (waypoint 3).
+    - target_alt (float): Altitude of the target location (waypoint 3).
+    - azimuth_angle (float): Azimuth angle in degrees (0-360) from the North.
+    - distance_1_2 (float): Distance between waypoint 1 and waypoint 2 (in meters).
+    - dive_angle (float): Dive angle in degrees (between waypoint 2 and waypoint 3).
+    - distance_leave (float): Distance between waypoint 3 and waypoint 4 (in meters).
+    
+    Returns:
+    - list of dicts: A list of waypoints with their latitude, longitude, and altitude.
     """
+    
+    # Convert angles from degrees to radians
+    azimuth_rad = math.radians(azimuth_angle)
+    dive_rad = math.radians(dive_angle)
 
-    # Wait for the service to be available
-    rospy.wait_for_service('/mavros/cmd/command')
+    # Calculate the change in latitude/longitude for distance 1 -> 2
+    delta_lat_1_2 = (distance_1_2 / EARTH_RADIUS) * math.cos(azimuth_rad)
+    delta_lon_1_2 = (distance_1_2 / (EARTH_RADIUS * math.cos(math.radians(current_lat)))) * math.sin(azimuth_rad)
 
-    try:
-        # Create a service proxy for the command_long service
-        command_long_service = rospy.ServiceProxy('/mavros/cmd/command', CommandLong)
+    # Waypoint 1: Starting point (before the dive)
+    waypoint_1_lat = current_lat - math.degrees(delta_lat_1_2)
+    waypoint_1_lon = current_lon - math.degrees(delta_lon_1_2)
+    waypoint_1_alt = current_alt  # Altitude remains the same as the plane's current altitude
 
-        # Call the service
-        response = command_long_service(target_system,
-                                        target_component,
-                                        command,
-                                        confirmation,
-                                        param1,
-                                        param2,
-                                        param3,
-                                        param4,
-                                        param5,
-                                        param6,
-                                        param7)
+    # Calculate the distance between waypoint 2 and 3 based on the dive angle
+    distance_2_3 = (current_alt - target_alt) / math.tan(dive_rad)
 
-        # Check the response and return the result
-        if response.success:
-            rospy.loginfo(f"Command {command} sent successfully with result {response.result}")
-        else:
-            rospy.logwarn(f"Failed to send command {command} with result {response.result}")
+    # Calculate the change in latitude/longitude for distance 2 -> 3
+    delta_lat_2_3 = (distance_2_3 / EARTH_RADIUS) * math.cos(azimuth_rad)
+    delta_lon_2_3 = (distance_2_3 / (EARTH_RADIUS * math.cos(math.radians(target_lat)))) * math.sin(azimuth_rad)
 
-        return response.success, response.result
+    # Waypoint 2: The point before the dive with the current altitude
+    waypoint_2_lat = waypoint_1_lat + math.degrees(delta_lat_2_3)
+    waypoint_2_lon = waypoint_1_lon + math.degrees(delta_lon_2_3)
+    waypoint_2_alt = current_alt  # Plane's current altitude
+    
+    # Waypoint 3: The target itself (end of the dive)
+    waypoint_3_lat = target_lat
+    waypoint_3_lon = target_lon
+    waypoint_3_alt = target_alt  # Target altitude
 
-    except rospy.ServiceException as e:
-        rospy.logerr(f"Service call failed: {e}")
-        return False, None
+    # Calculate the change in latitude/longitude for distance leaving the target
+    delta_lat_leave = (distance_leave / EARTH_RADIUS) * math.cos(azimuth_rad)
+    delta_lon_leave = (distance_leave / (EARTH_RADIUS * math.cos(math.radians(target_lat)))) * math.sin(azimuth_rad)
+
+    # Waypoint 4: Leaving point after the target
+    waypoint_4_lat = target_lat + math.degrees(delta_lat_leave)
+    waypoint_4_lon = target_lon + math.degrees(delta_lon_leave)
+    waypoint_4_alt = target_alt  # Altitude remains the same as the target altitude
+
+    waypoints = [
+        [waypoint_1_lat, waypoint_1_lon, waypoint_1_alt],
+        [waypoint_2_lat, waypoint_2_lon, waypoint_2_alt],
+        [waypoint_3_lat, waypoint_3_lon, waypoint_3_alt],
+        [waypoint_4_lat, waypoint_4_lon, waypoint_4_alt],
+    ]
+    return waypoints
 
 
+def calculate_waypoint(latitude, longitude, distance, bearing):
+    """
+    Calculate a new waypoint given a starting coordinate, distance, and bearing.
+    """
+    latitude_rad = math.radians(latitude)
+    longitude_rad = math.radians(longitude)
+    bearing_rad = math.radians(bearing)
 
+    latitude_dest_rad = math.asin(
+        math.sin(latitude_rad) * math.cos(distance / EARTH_RADIUS) +
+        math.cos(latitude_rad) * math.sin(distance / EARTH_RADIUS) * math.cos(bearing_rad)
+    )
 
+    longitude_dest_rad = longitude_rad + math.atan2(
+        math.sin(bearing_rad) * math.sin(distance / EARTH_RADIUS) * math.cos(latitude_rad),
+        math.cos(distance / EARTH_RADIUS) - math.sin(latitude_rad) * math.sin(latitude_dest_rad)
+    )
 
+    latitude_dest = math.degrees(latitude_dest_rad)
+    longitude_dest = math.degrees(longitude_dest_rad)
+
+    return latitude_dest, longitude_dest
+   
+"""
+This part of the module is containing image processing functions for qr detection 
+"""
+
+def adjust_brightness_contrast(image, brightness=0, contrast=0):
+    # Brightness: -255 to 255, Contrast: -127 to 127
+    if brightness != 0:
+        image = cv2.convertScaleAbs(image, beta=brightness)
+    if contrast != 0:
+        image = cv2.addWeighted(image, 1.0 + contrast / 127.0, image, 0, 0)
+    return image
+
+def gamma_correction(image, gamma=1.0):
+    invGamma = 1.0 / gamma
+    table = np.array([(i / 255.0) ** invGamma * 255 for i in np.arange(0, 256)]).astype("uint8")
+    return cv2.LUT(image, table)
+
+def convert_to_grayscale(image):
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+def adaptive_threshold(image):
+    gray = convert_to_grayscale(image)
+    return cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+
+def histogram_equalization(image):
+    gray = convert_to_grayscale(image)
+    return cv2.equalizeHist(gray)
+
+def color_filter(image, lower_bound, upper_bound):
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, lower_bound, upper_bound)
+    return cv2.bitwise_and(image, image, mask=mask)
+
+def edge_detection(image):
+    gray = convert_to_grayscale(image)
+    edges = cv2.Canny(gray, 100, 200)
+    return edges
+
+def noise_reduction(image):
+    return cv2.GaussianBlur(image, (5, 5), 0)
+
+def adjust_exposure(image, exposure=-1.0):
+    # Exposure: negative for less exposure, positive for more
+    return cv2.convertScaleAbs(image, alpha=1, beta=exposure)
+
+def reduce_glare(image):
+    # Apply Gaussian Blur and thresholding to reduce glare
+    blurred = cv2.GaussianBlur(image, (5, 5), 0)
+    return cv2.threshold(blurred, 200, 255, cv2.THRESH_BINARY)[1]

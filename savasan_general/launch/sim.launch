@@ -50,6 +50,6 @@
     <node name="home_gps_publisher"    pkg="savasan_general"   type="home_gps_publisher.py"    output="screen"/> <!-- Home GPS Publisher -->
 
     <!-- Start RViz with the specified configuration file -->
-    <node pkg="tf"   type="static_transform_publisher" name="odom_to_map_broadcaster" args="0 0 0 0 0 0 map odom 100" />
-    <node pkg="rviz" type="rviz"                       name="rviz"                    args="-d $(find rviz_satellite)/launch/demo.rviz"/>
+    <node pkg="tf"            type="static_transform_publisher" name="odom_to_map_broadcaster" args="0 0 0 0 0 0 map odom 100" />
+    <node pkg="rviz"          type="rviz"                       name="rviz"                    args="-d $(find rviz_satellite)/launch/demo.rviz"/>
 </launch>

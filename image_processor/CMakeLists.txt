@@ -8,7 +8,6 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   roscpp 
   message_generation
-  server_comm
 )
 
 add_message_files(
@@ -23,7 +22,7 @@ generate_messages(
 )
 
 catkin_package(
-  CATKIN_DEPENDS std_msgs rospy sensor_msgs cv_bridge message_runtime server_comm
+  CATKIN_DEPENDS std_msgs rospy sensor_msgs cv_bridge message_runtime
 )
 
 include_directories(
