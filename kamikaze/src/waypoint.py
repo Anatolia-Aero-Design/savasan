@@ -49,21 +49,7 @@ class WaypointNode:
             "/mavros/global_position/rel_alt", Float64, self.rel_altitude_callback
         )
         
-        self.server_url_kamikaze_bilgisi = rospy.get_param('/comm_node/api/kamikaze_bilgisi')
-        
-    def uav_pose_callback(self, data):
-        self.uav_x, self.uav_y, self.uav_z = (
-            data.pose.position.x,
-            data.pose.position.y,
-            data.pose.position.z,
-        )
-        self.roll, self.pitch, self.yaw = utils.quaternion_to_euler(
-            data.pose.orientation.w,
-            data.pose.orientation.x,
-            data.pose.orientation.y,
-            data.pose.orientation.z,
-        )
-        
+
     def rel_altitude_callback(self, data):
         self.altitude = float(data.data)  # Extract data from the message
         
@@ -133,56 +119,7 @@ class WaypointNode:
             rospy.logerr("Insufficient geodetic coordinates generated.")
             return EmptyResponse()
         
-        print(geodetic_coords)
         waypoints = self.waypoints(geodetic_coords) 
-        print(waypoints)
-        
-        #waypoints = self.waypoints()
-        if not waypoints:
-            rospy.logerr("No waypoints to push.")
-            return EmptyResponse()
-        
-        # Push waypoints to the flight controller
-        result = self.push_waypoints(waypoints)
-        if result:
-            rospy.loginfo("Waypoints pushed successfully!")
-        else:
-            rospy.logerr("Failed to push waypoints!")
-        
-        return EmptyResponse()
-    
- 
-    def push_waypoints(self, waypoints):
-        rospy.wait_for_service('/mavros/mission/push')
-        rospy.wait_for_service('/mavros/mission/clear')
-
-        try:
-            # Create service proxies for clearing and pushing waypoints
-            clear_waypoints_service = rospy.ServiceProxy('/mavros/mission/clear', WaypointClear)
-            push_waypoints_service = rospy.ServiceProxy('/mavros/mission/push', WaypointPush)
-            
-            # Clear existing waypoints
-            clear_response = clear_waypoints_service()
-            rospy.loginfo("Waypoints cleared: %s", clear_response.success)
-            
-            if clear_response.success:
-                # Push new waypoints
-                response = push_waypoints_service(start_index=0, waypoints=waypoints.waypoints)  # Pass the full list of waypoints
-                rospy.loginfo("Waypoints pushed: %s", response.success)
-                rospy.loginfo("Number of waypoints transferred: %d", response.wp_transfered)
-                
-                return response.wp_transfered
-            else:
-                rospy.logwarn("Failed to clear waypoints, aborting mission upload.")
-                return False
-        
-        except rospy.ServiceException as e:
-            rospy.logerr("Service call failed: %s", e)
-            return False
-
-
-
-
 
         # Modify waypoints_with_angle() function to accept an angle_degrees parameter
     def waypoints(self, geodetic_coords):
