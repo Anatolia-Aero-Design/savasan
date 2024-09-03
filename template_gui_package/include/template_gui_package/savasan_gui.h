@@ -28,6 +28,24 @@ private slots:
 
   void on_verticalSlider_sliderMoved(int position);
 
+  void on_startGpsTracking_clicked();
+
+  void on_stopGpsTracking_clicked();
+
+  void on_startYolo_clicked();
+
+  void on_stopYolo_clicked();
+
+  void on_startCompetition_clicked();
+
+  void on_stopCompetition_clicked();
+
+  void on_UsePID_stateChanged(int arg1);
+
+  void on_startRecording_clicked();
+
+  void on_stopRecording_clicked();
+
 private:
   Ui::SavasanGui *ui;
   ros::Subscriber log_subscriber;
