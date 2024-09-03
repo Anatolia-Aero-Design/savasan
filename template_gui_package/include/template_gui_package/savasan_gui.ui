@@ -26,7 +26,7 @@
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Tracking&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="tab">
     <attribute name="title">
@@ -127,6 +127,16 @@
      </property>
      <property name="text">
       <string>PushButton</string>
+     </property>
+    </widget>
+    <widget class="QTextBrowser" name="tracker_logger">
+     <property name="geometry">
+      <rect>
+       <x>25</x>
+       <y>151</y>
+       <width>621</width>
+       <height>301</height>
+      </rect>
      </property>
     </widget>
    </widget>

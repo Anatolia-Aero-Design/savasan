@@ -170,8 +170,6 @@ class Comm_Node:
         self.bbox_y = msg.y
         self.bbox_w = msg.w
         self.bbox_h = msg.h
-        rospy.loginfo(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
-        logging.info(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
         self.process_data()
 
     def login(self):

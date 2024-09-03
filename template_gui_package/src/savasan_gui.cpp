@@ -106,6 +106,10 @@ void SavasanGui::handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg)
         ui->kamikaze_logs->append(logMessage);
         ui->kamikaze_logs->moveCursor(QTextCursor::End);
     }
+  else if (QString::fromStdString(msg->name) == "/yolov8_node") {
+        ui->kamikaze_logs->append(logMessage);
+        ui->tracker_logger->moveCursor(QTextCursor::End);
+  }
   else {
     ui->general_log->append(logMessage);
     ui->general_log->moveCursor(QTextCursor::End);
