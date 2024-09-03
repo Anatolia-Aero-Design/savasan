@@ -9,7 +9,7 @@ import time
 from utils import quaternion_to_euler, calculate_speed, mode_guided
 
 # Configure logging
-logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename='/home/poyrazzo/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def connect_to_vehicle(connection_string):
     try:

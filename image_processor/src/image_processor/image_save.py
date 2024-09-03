@@ -20,7 +20,7 @@ class VideoSaveNode:
         file_name = f"{competition_no}_Anatolia_Aero_Design_{current_time.tm_mday}_0{current_time.tm_mon}_{current_time.tm_year}.avi"
         # Initialize video writer
         self.video_writer = None
-        self.video_filename = f"/home/valvarn/catkin_ws/src/savasan/{file_name}"
+        self.video_filename = f"/home/poyrazzo/catkin_ws/src/savasan/{file_name}"
         self.fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         self.frame_width =  1280  # Update this with the actual width of your image
         self.frame_height = 720  # Update this with the actual height of your image

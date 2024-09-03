@@ -87,7 +87,7 @@ class Comm_Node:
 
 
         # Configure logging
-        logging.basicConfig(filename='/home/valvarn/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.basicConfig(filename='/home/poyrazzo/catkin_ws/logs/serverlog.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
       
     def fcu_time_callback(self, msg):
         self.fcu_time = msg.time_ref.secs
@@ -140,29 +140,6 @@ class Comm_Node:
     def state_callback(self, msg):
         self.state = msg
         self.process_data()
-    
-    def qr_check(self,req):
-        self.qr_published=False
-        
-    def qr_callback(self,msg):
-        if self.qr_published is False:  # Check if the QR data has already been published
-            self.qr_data = msg.data
-            self.publish_qr()
-        else:
-            rospy.loginfo("qr zaten okundu aga")
-
-    def lock_on_callback(self, msg):
-        self.lock_on = msg
-        self.process_data()
-
-    def kilit_callback(self, msg):
-        self.kilit = msg.data
-        rospy.loginfo(f"Received kilit: {msg.data}")
-        logging.info(f"Received kilit: {msg.data}")
-        self.process_data()
-
-        self.lock_on_thread = threading.Thread(target=self.send_lock_on_info(self.kilit, self.lock_on))
-        self.lock_on_thread.start()
 
     def bbox_callback(self, msg):
         self.bbox = msg
@@ -352,7 +329,7 @@ class Comm_Node:
                         
                         response = self.session.post(self.server_url_qr_bilgisi, json=data_dict)
                         if response.status_code == 200:
-                            logging.info(f"Lock-on data sent successfully: {response.json()}")
+                            logging.info(f"kamikaze data sent successfully: {response.json()}")
                         else:
                             logging.error(f"Failed to send lock-on data, status code: {response.status_code}")
                             

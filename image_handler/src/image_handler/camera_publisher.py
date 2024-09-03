@@ -11,10 +11,10 @@ def camera_publisher():
 
     bridge = CvBridge()
     while 1:
-        gst_pipeline = ("udpsrc port=5600 ! application/x-rtp,media=video,clock-rate=90000,encoding-name=H264 !\
-                        rtph264depay ! avdec_h264 ! videoconvert ! appsink") # used for connecting to gazebo sim camera. This path is given to VideoCapture()
+        """gst_pipeline = ("udpsrc port=5600 ! application/x-rtp,media=video,clock-rate=90000,encoding-name=H264 !\
+                        rtph264depay ! avdec_h264 ! videoconvert ! appsink") # used for connecting to gazebo sim camera. This path is given to VideoCapture()"""
         
-        cap = cv2.VideoCapture("/home/valvarn/catkin_ws/src/savasan/image_handler/video/FoggyFPVHeaven.mp4")
+        cap = cv2.VideoCapture("/home/poyrazzo/catkin_ws/src/savasan/image_handler/video/FoggyFPVHeaven.mp4")
 
         if not cap.isOpened():
             rospy.logerr("Cannot open camera")

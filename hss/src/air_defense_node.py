@@ -23,7 +23,7 @@ class Air_Defense_Node:
         self.state = None
         self.heading = None
         self.geofence_list = []
-        self.mission_file_path = "/home/valvarn/fence-items.txt"
+        self.mission_file_path = "/home/poyrazzo/fence-items.txt"
         
         # Set up subscribers
         self.uav_pose_sub = rospy.Subscriber('/mavros/global_position/global', NavSatFix, self.uav_pose_callback)

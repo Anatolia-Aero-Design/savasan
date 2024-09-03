@@ -66,11 +66,20 @@ def get_qr_coordinates():
     
 @app.route('/api/kilitlenme_bilgisi', methods=['POST'])
 def kenetlenme_bilgisi_gonder():
-    ...    
+    json_data = request.get_json()
+
+    #print(f"Received lock-on data: {json_data}")
+    competition.update_lock_on(json_data)
+    response = competition.response_json()
+
+    return jsonify({"status": "success"}), 200
 
 @app.route('/api/kamikaze_bilgisi', methods=['POST'])
-def kamikaze_bilgisi_gonder():
-    ...
+def get_qr_data():
+    json_data = request.get_json()
+    print(f"qr data: {json_data}")
+    return jsonify({"qr data": json_data}), 200
+
                
 if __name__ == '__main__':
     competition = Competition()

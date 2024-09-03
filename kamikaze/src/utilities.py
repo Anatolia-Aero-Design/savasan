@@ -4,6 +4,8 @@ import tf.transformations as tf_trans
 import numpy as np
 import cv2
 from geometry_msgs.msg import Quaternion
+import rospy
+from pyproj import CRS, Transformer,Proj,transform
 
 # Constant for Earth's radius in meters
 EARTH_RADIUS = 6371000
@@ -25,6 +27,120 @@ def haversine_formula(latitude_1, longitude_1, latitude_2, longitude_2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     distance = EARTH_RADIUS * c
     return distance
+
+def geodetic2enu(lat, lon, alt, ref_lat, ref_lon, ref_alt):
+    """
+    Convert geodetic coordinates to ENU coordinates relative to a reference point.
+    """
+    # Define the CRS for the reference point
+    crs_wgs84 = CRS.from_epsg(4326)  # WGS84 geodetic coordinates
+    crs_utm = CRS(proj='utm', zone=33, datum='WGS84')  # Example UTM zone, adjust as necessary
+
+    # Create a transformer for converting from geodetic to UTM
+    transformer_geodetic_to_utm = Transformer.from_crs(crs_wgs84, crs_utm, always_xy=True)
+
+    # Convert the reference point (lat, lon, alt) to UTM coordinates
+    ref_utm = transformer_geodetic_to_utm.transform(ref_lon, ref_lat, ref_alt)
+
+    # Convert the input point (lat, lon, alt) to UTM coordinates
+    point_utm = transformer_geodetic_to_utm.transform(lon, lat, alt)
+
+    # Calculate ENU coordinates
+    e = point_utm[0] - ref_utm[0]
+    n = point_utm[1] - ref_utm[1]
+    u = point_utm[2] - ref_utm[2]
+
+    return (e, n, u)
+
+def enu_to_geodetic(east, north, up, origin_lat, origin_lon, origin_alt):
+    # Define the projection system for ENU
+    transformer = Transformer.from_crs("EPSG:4978", "EPSG:4326", always_xy=True)
+    
+    # Convert origin from geodetic to ECEF
+    origin_ecef = transformer.transform(origin_lon, origin_lat, origin_alt)
+
+    # Use the ENU to ECEF conversion equations
+    # For simplicity, we'll assume a flat Earth approximation here.
+    lat = origin_lat + north / 111000  # Approximate conversion (1 degree latitude ~ 111 km)
+    lon = origin_lon + east / (111000 * math.cos(math.radians(origin_lat)))  # Approximate conversion
+    alt = origin_alt + up
+
+    return lat, lon, alt
+
+def calculate_coordinates(radius, azimuth_angle):
+    if 0 < azimuth_angle <= 90:
+        new_azimuth_angle_rad = math.radians(azimuth_angle)
+        y = math.cos(new_azimuth_angle_rad) * radius
+        x = math.sin(new_azimuth_angle_rad) * radius
+    elif 90 < azimuth_angle <= 180:
+        new_azimuth_angle_rad = math.radians(180 - azimuth_angle)
+        y = -math.cos(new_azimuth_angle_rad) * radius
+        x =  math.sin(new_azimuth_angle_rad) * radius
+    elif 180 < azimuth_angle <= 270:
+        new_azimuth_angle_rad = math.radians(270 - azimuth_angle)
+        x = -math.cos(new_azimuth_angle_rad) * radius
+        y = -math.sin(new_azimuth_angle_rad) * radius
+    elif 270 < azimuth_angle <= 360:
+        new_azimuth_angle_rad = math.radians(360 - azimuth_angle)
+        y = math.cos(new_azimuth_angle_rad) * radius
+        x = -math.sin(new_azimuth_angle_rad) * radius
+    if abs(x) < 1e-10:  
+        x = 0
+
+    return x, y
+
+def exit_calculate_coordinates(radius, azimuth_angle):
+    if 0 < azimuth_angle <= 90:
+        new_azimuth_angle_rad = math.radians(azimuth_angle)
+        y = -math.cos(new_azimuth_angle_rad) * radius
+        x = -math.sin(new_azimuth_angle_rad) * radius
+    elif 90 < azimuth_angle <= 180:
+        new_azimuth_angle_rad = math.radians(180 - azimuth_angle)
+        y =  math.cos(new_azimuth_angle_rad) * radius
+        x = -math.sin(new_azimuth_angle_rad) * radius
+    elif 180 < azimuth_angle <= 270:
+        new_azimuth_angle_rad = math.radians(270 - azimuth_angle)
+        x = math.cos(new_azimuth_angle_rad) * radius
+        y = math.sin(new_azimuth_angle_rad) * radius
+    elif 270 < azimuth_angle <= 360:
+        new_azimuth_angle_rad = math.radians(360 - azimuth_angle)
+        y = -math.cos(new_azimuth_angle_rad) * radius
+        x =  math.sin(new_azimuth_angle_rad) * radius
+    if abs(x) < 1e-10:  
+        x = 0
+
+    return x, y
+
+def lat_lon_to_ecef(lat, lon, alt):
+    # WGS84 ellipsoid parameters
+    a = 6378137.0  # semi-major axis in meters
+    e = 8.181919e-2  # first eccentricity squared
+
+    lat_rad = math.radians(lat)
+    lon_rad = math.radians(lon)
+
+    N = a / math.sqrt(1 - e * math.sin(lat_rad) ** 2)
+    x = (N + alt) * math.cos(lat_rad) * math.cos(lon_rad)
+    y = (N + alt) * math.cos(lat_rad) * math.sin(lon_rad)
+    z = ((1 - e) * N + alt) * math.sin(lat_rad)
+
+    return x, y, z
+
+def ecef_to_lat_lon_alt(x, y, z):
+    """Convert ECEF coordinates to latitude, longitude, and altitude."""
+    # WGS84 ellipsoid parameters
+    a = 6378137.0  # Semi-major axis
+    e2 = 0.00669437999014  # Eccentricity squared
+
+    lon = np.arctan2(y, x)
+    p = np.sqrt(x**2 + y**2)
+    lat = np.arctan2(z, p * (1 - e2))
+    N = a / np.sqrt(1 - e2 * np.sin(lat)**2)
+    alt = p / np.cos(lat) - N
+
+    lat = np.degrees(lat)
+    lon = np.degrees(lon)
+    return lat, lon, alt
 
 def geodetic_to_cartesian(lat, lon, alt):
     # WGS84 ellipsoid parameters
@@ -101,73 +217,42 @@ def gps_to_xyz(home_lat, home_lon, home_alt, target_lat, target_lon, target_alt)
     
     return delta_x, delta_y, delta_z
 
-def calculate_waypoint_sequence(current_lat, current_lon, current_alt, target_lat, target_lon, 
-                                target_alt, azimuth_angle, distance_1_2, dive_angle, distance_leave):
-    """
-    Generate waypoints based on the given target location, azimuth angle, and distances for a dive maneuver.
+def calculate_waypoints_with_angle(target_lat, target_lon, angle_degrees, distance1, distance2, distance3,distance4):
+    R = 6371000  # Radius of the Earth
+    try:
+        # Convert latitude and longitude from degrees to radians
+        target_lat_rad = math.radians(target_lat)
+        target_lon_rad = math.radians(target_lon)
+        angle_rad = math.radians(angle_degrees)
 
-    Args:
-    - current_lat (float): Current latitude of the plane (waypoint 2).
-    - current_lon (float): Current longitude of the plane (waypoint 2).
-    - current_alt (float): Current altitude of the plane (waypoint 2).
-    - target_lat (float): Latitude of the target location (waypoint 3).
-    - target_lon (float): Longitude of the target location (waypoint 3).
-    - target_alt (float): Altitude of the target location (waypoint 3).
-    - azimuth_angle (float): Azimuth angle in degrees (0-360) from the North.
-    - distance_1_2 (float): Distance between waypoint 1 and waypoint 2 (in meters).
-    - dive_angle (float): Dive angle in degrees (between waypoint 2 and waypoint 3).
-    - distance_leave (float): Distance between waypoint 3 and waypoint 4 (in meters).
-    
-    Returns:
-    - list of dicts: A list of waypoints with their latitude, longitude, and altitude.
-    """
-    
-    # Convert angles from degrees to radians
-    azimuth_rad = math.radians(azimuth_angle)
-    dive_rad = math.radians(dive_angle)
+        # Calculate the waypoint at a certain distance and angle
+        def calculate_waypoint(lat_rad, lon_rad, distance, angle):
+            lat_new_rad = math.asin(math.sin(lat_rad) * math.cos(distance / R) +
+                                    math.cos(lat_rad) * math.sin(distance / R) * math.cos(angle))
+            lon_new_rad = lon_rad + math.atan2(math.sin(angle) * math.sin(distance / R) * math.cos(lat_rad),
+                                               math.cos(distance / R) - math.sin(lat_rad) * math.sin(lat_new_rad))
+            return lat_new_rad, lon_new_rad
 
-    # Calculate the change in latitude/longitude for distance 1 -> 2
-    delta_lat_1_2 = (distance_1_2 / EARTH_RADIUS) * math.cos(azimuth_rad)
-    delta_lon_1_2 = (distance_1_2 / (EARTH_RADIUS * math.cos(math.radians(current_lat)))) * math.sin(azimuth_rad)
+        # Calculate waypoints
+        wp3_lat_rad, wp3_lon_rad = calculate_waypoint(target_lat_rad, target_lon_rad, distance3, angle_rad)
+        wp2_lat_rad, wp2_lon_rad = calculate_waypoint(wp3_lat_rad, wp3_lon_rad, distance2, angle_rad)
+        wp1_lat_rad, wp1_lon_rad = calculate_waypoint(wp2_lat_rad, wp2_lon_rad, distance1, angle_rad)
+        wp5_lat_rad, wp5_lon_rad = calculate_waypoint(target_lat_rad, target_lon_rad, distance4, angle_rad + math.pi)  # Adding pi to get the opposite direction
 
-    # Waypoint 1: Starting point (before the dive)
-    waypoint_1_lat = current_lat - math.degrees(delta_lat_1_2)
-    waypoint_1_lon = current_lon - math.degrees(delta_lon_1_2)
-    waypoint_1_alt = current_alt  # Altitude remains the same as the plane's current altitude
+        # Convert back to degrees
+        wp1_lat_deg, wp1_lon_deg = math.degrees(wp1_lat_rad), math.degrees(wp1_lon_rad)
+        wp2_lat_deg, wp2_lon_deg = math.degrees(wp2_lat_rad), math.degrees(wp2_lon_rad)
+        wp3_lat_deg, wp3_lon_deg = math.degrees(wp3_lat_rad), math.degrees(wp3_lon_rad)
+        wp5_lat_deg, wp5_lon_deg = math.degrees(wp5_lat_rad), math.degrees(wp5_lon_rad)
 
-    # Calculate the distance between waypoint 2 and 3 based on the dive angle
-    distance_2_3 = (current_alt - target_alt) / math.tan(dive_rad)
+        return [(wp1_lat_deg, wp1_lon_deg),
+                (wp2_lat_deg, wp2_lon_deg),
+                (wp3_lat_deg, wp3_lon_deg),
+                (wp5_lat_deg, wp5_lon_deg)]
 
-    # Calculate the change in latitude/longitude for distance 2 -> 3
-    delta_lat_2_3 = (distance_2_3 / EARTH_RADIUS) * math.cos(azimuth_rad)
-    delta_lon_2_3 = (distance_2_3 / (EARTH_RADIUS * math.cos(math.radians(target_lat)))) * math.sin(azimuth_rad)
-
-    # Waypoint 2: The point before the dive with the current altitude
-    waypoint_2_lat = waypoint_1_lat + math.degrees(delta_lat_2_3)
-    waypoint_2_lon = waypoint_1_lon + math.degrees(delta_lon_2_3)
-    waypoint_2_alt = current_alt  # Plane's current altitude
-    
-    # Waypoint 3: The target itself (end of the dive)
-    waypoint_3_lat = target_lat
-    waypoint_3_lon = target_lon
-    waypoint_3_alt = target_alt  # Target altitude
-
-    # Calculate the change in latitude/longitude for distance leaving the target
-    delta_lat_leave = (distance_leave / EARTH_RADIUS) * math.cos(azimuth_rad)
-    delta_lon_leave = (distance_leave / (EARTH_RADIUS * math.cos(math.radians(target_lat)))) * math.sin(azimuth_rad)
-
-    # Waypoint 4: Leaving point after the target
-    waypoint_4_lat = target_lat + math.degrees(delta_lat_leave)
-    waypoint_4_lon = target_lon + math.degrees(delta_lon_leave)
-    waypoint_4_alt = target_alt  # Altitude remains the same as the target altitude
-
-    waypoints = [
-        [waypoint_1_lat, waypoint_1_lon, waypoint_1_alt],
-        [waypoint_2_lat, waypoint_2_lon, waypoint_2_alt],
-        [waypoint_3_lat, waypoint_3_lon, waypoint_3_alt],
-        [waypoint_4_lat, waypoint_4_lon, waypoint_4_alt],
-    ]
-    return waypoints
+    except Exception as e:
+        rospy.logerr(f"Error calculating waypoints: {e}")
+        return []  # Ensure it returns an empty list on error
 
 
 def calculate_waypoint(latitude, longitude, distance, bearing):
