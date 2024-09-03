@@ -35,11 +35,6 @@ class WaypointNode:
         self.distance_of_approach = rospy.get_param("loreippsum")
         self.offset = rospy.get_param("loreippsum")"""
         
-        
-        clear_waypoints_service = rospy.ServiceProxy('/mavros/mission/clear', WaypointClear)
-        rospy.wait_for_service('/mavros/mission/clear')
-        clear_response = clear_waypoints_service()
-        rospy.loginfo("Waypoints cleared: %s", clear_response.success)
             
         self.start_service = rospy.Service("start_kamikaze", Empty, self.start_waypoint)
         self.pose_sub = rospy.Subscriber(
