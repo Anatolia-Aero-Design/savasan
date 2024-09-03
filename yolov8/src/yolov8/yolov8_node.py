@@ -94,7 +94,6 @@ class YOLOv8TrackingNode:
             self.xyxy.w = 0
             self.xyxy.h = 0
         t4 = time.time()
-        print(t4 - t3)
 
         current_time = rospy.get_time()
         dt = current_time - self.prev_time
