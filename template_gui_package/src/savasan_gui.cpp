@@ -67,9 +67,9 @@ void SavasanGui::onStartKamikazeButtonClicked()
   int approachDistance = ui->approach_input->text().toInt();
 
   // Set ROS parameters
-  ros::param::set("azimut_degree", azimut);
+  ros::param::set("azimuth_angle", azimut);
   ros::param::set("dive_angle", diveAngle);
-  ros::param::set("offset", offset);
+  ros::param::set("circle_offset", offset);
   ros::param::set("approach_distance", approachDistance);
 
   // Optional: Log the parameters to the console for debugging
@@ -77,11 +77,11 @@ void SavasanGui::onStartKamikazeButtonClicked()
            azimut, diveAngle, offset, approachDistance);
 
   ros::NodeHandle nh;
-  ros::ServiceClient client = nh.serviceClient<std_srvs::Empty>("/start_kamikaze");
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("/start_kamikaze");
 
 
   QtConcurrent::run([client]() mutable {
-    std_srvs::Empty srv;
+    std_srvs::Trigger srv;
     if (client.call(srv)) {
         ROS_INFO("Service /start_kamikaze called successfully.");
     } else {

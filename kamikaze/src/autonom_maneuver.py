@@ -80,7 +80,7 @@ class Autonom_Maneuver_Node:
         self.yaw_pid = PIDController(kp=1, ki=0.4, kd=0.05)
         self.pitch_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)
 
-        self.start_service = rospy.Service("/start_kamikaze", Empty, self.start_mission)
+        self.start_service = rospy.Service("/start_kamikaze_old", Empty, self.start_mission)
         self.stop_service = rospy.Service("/stop_kamikaze", Empty, self.stop_mission)
         self.abort_service = rospy.Service("/abort_kamikaze", Empty, self.abort_mission)
 
