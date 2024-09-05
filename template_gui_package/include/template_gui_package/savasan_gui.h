@@ -21,12 +21,6 @@ public:
 private slots:
   void onStartKamikazeButtonClicked();
   void handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg);
-  void onAltitudeSliderChanged(int value);  // Slot for altitude slider
-  void onSpeedSliderChanged(int value);
-
-  void on_verticalSlider_valueChanged(int value);
-
-  void on_verticalSlider_sliderMoved(int position);
 
   void on_startGpsTracking_clicked();
 

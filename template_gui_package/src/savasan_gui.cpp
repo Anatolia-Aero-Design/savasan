@@ -135,12 +135,6 @@ void SavasanGui::handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg)
   }
 }
 
-void SavasanGui::onAltitudeSliderChanged(int value)
-{
-  // Handle the altitude slider value change
-  ROS_INFO("Daha implement etmedim kral");
-
-}
 
 void sendcommandint(int command, int param1, int param2, int param3, int param4,int x,int y,int z){
     ros::NodeHandle nh2;
@@ -167,16 +161,6 @@ void sendcommandint(int command, int param1, int param2, int param3, int param4,
             ROS_ERROR("Failed to send command.");
         };
 }
-
-void SavasanGui::onSpeedSliderChanged(int value)
-{
-  // Handle the speed slider value change
-  ROS_INFO("Speed slider changed to: %d", value);
-
-  sendcommandint(178,0,value,0,0,0,0,0);
-}
-
-
 
 
 void SavasanGui::on_startGpsTracking_clicked()
