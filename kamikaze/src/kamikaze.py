@@ -183,8 +183,7 @@ class UAVWaypointManager:
         except rospy.ServiceException as e:
             rospy.logerr("Waypoints generated and pushed Failed: %s", e)
             return TriggerResponse(success=False)
-        
-        utils.set_params_for_dive()
+
         
         
         
