@@ -5,13 +5,12 @@ from sensor_msgs.msg import Image, Imu
 from mavros_msgs.msg import AttitudeTarget
 from cv_bridge import CvBridge, CvBridgeError
 from ultralytics import YOLO
-from std_srvs.srv import Trigger, TriggerResponse
+from std_srvs.srv import Trigger,TriggerResponse
 from image_processor.msg import Yolo_xywh  # Import the custom message#
 import cv2
 import time
 import math
 import numpy as np
-from PID import *
 import rospkg
 import os
 
@@ -27,7 +26,7 @@ class YOLOv8TrackingNode:
             '/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         self.bbox_pub = rospy.Publisher(
             "/yolov8/xywh", Yolo_xywh, queue_size=60)
-
+        
         rospack = rospkg.RosPack()
         package_path = rospack.get_path('yolov8')
         file_path = os.path.join(package_path, 'model/best_s.pt')
@@ -41,14 +40,6 @@ class YOLOv8TrackingNode:
             'stop_yolov8_tracking', Trigger, self.stop_tracking)
         self.xyxy = Yolo_xywh()
 
-        # PID controllers for yaw, pitch, and roll
-        self.yaw_pid = PID(Kp=1.0, Ki=0.01, Kd=0.1)
-        self.pitch_pid = PID(Kp=1.0, Ki=0.01, Kd=0.1)
-        self.roll_pid = PID(Kp=1.0, Ki=0.01, Kd=0.1)
-
-        # Image window name
-        self.window_name = 'YOLOv8 Tracking'
-
     def start_tracking(self, req):
         try:
             if self.image_sub is None:
@@ -58,6 +49,7 @@ class YOLOv8TrackingNode:
             return TriggerResponse(success=1)
         except:
             return TriggerResponse(success=0)
+
 
     def stop_tracking(self, req):
         try:
@@ -85,8 +77,11 @@ class YOLOv8TrackingNode:
             return
 
         # Run YOLOv8 tracking on the frame, persisting tracks between frames
+        t1 = time.time()
         results = self.model.track(
             frame, persist=True, stream_buffer=True, verbose=False)
+        t2 = time.time()
+        t3 = time.time()
         result = results[0].boxes.xyxy.cpu().numpy()
         try:
             track_ids = results[0].boxes.id.int().cpu().tolist()
@@ -108,13 +103,7 @@ class YOLOv8TrackingNode:
             self.xyxy.h = 0
         t4 = time.time()
 
-        current_time = rospy.get_time()
-        dt = current_time - self.prev_time
-        self.prev_time = current_time
-
         self.bbox_pub.publish(self.xyxy)
-
-    
 
 
 if __name__ == '__main__':

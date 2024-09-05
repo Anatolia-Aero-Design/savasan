@@ -202,7 +202,10 @@ class Comm_Node:
         self.fcu_time_nsecs = msg.time_ref.nsecs
 
     def kilit_callback(self, msg):
-        self.kilit = msg
+        if msg:
+            self.kilit = 1
+        else:
+            self.kilit = 0
         
 
     def login(self):
@@ -312,7 +315,7 @@ class Comm_Node:
                                     ),
                 "iha_batarya": int(self.battery.percentage * 100),
                 "iha_otonom": IHA_otonom,
-                "iha_kilitlenme": self.kilit,
+                "iha_kilitlenme": int(self.kilit),
                 "hedef_merkez_X": self.bbox_x,
                 "hedef_merkez_Y": self.bbox_y,
                 "hedef_genislik": self.bbox_w,
@@ -324,7 +327,6 @@ class Comm_Node:
             response = self.session.post(
                 self.server_url_telemetri_gonder, json=data_dict
             )
-            rospy.loginfo(f"Sent data to server: {data_dict}")
 
             # Check server response
             if response.status_code == 200:
