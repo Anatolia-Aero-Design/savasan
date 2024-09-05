@@ -220,11 +220,9 @@ class Comm_Node:
 
     def login(self):
         url = f"{self.base_url}/giris"
-        headers = {"Content-Type": "application/json",
-                   "Accept": "application/json"}
         data = {"kadi": self.username, "sifre": self.password}
         response = self.session.post(
-            url, json=data, headers=headers, timeout=10)
+            url, json=data, headers=self.header, timeout=10)
         if response.status_code == 200:
             print("Login successful!")
             print(response.json())
