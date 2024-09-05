@@ -16,6 +16,7 @@ SavasanGui::SavasanGui(QWidget *parent) :
   ui->setupUi(this);
   ui->online_led->setText("  Offline");
 
+
   QPalette palette = ui->online_led->palette();
   palette.setColor(QPalette::WindowText, Qt::red);  // You can change Qt::red to any color you want
   ui->online_led->setPalette(palette);
@@ -23,8 +24,6 @@ SavasanGui::SavasanGui(QWidget *parent) :
   // Connect the button to the slot
   connect(ui->pushButton_3, &QPushButton::clicked, this, &SavasanGui::onStartKamikazeButtonClicked);
 
-  connect(ui->verticalSlider, &QSlider::valueChanged, this, &SavasanGui::onAltitudeSliderChanged);
-  connect(ui->horizontalSlider, &QSlider::valueChanged, this, &SavasanGui::onSpeedSliderChanged);
   connect(ui->startGpsTracking, &QPushButton::clicked, this, &SavasanGui::on_startGpsTracking_clicked);
   connect(ui->stopGpsTracking, &QPushButton::clicked, this, &SavasanGui::on_stopGpsTracking_clicked);
   connect(ui->startYolo, &QPushButton::clicked, this, &SavasanGui::on_startYolo_clicked);
@@ -67,9 +66,9 @@ void SavasanGui::onStartKamikazeButtonClicked()
   int approachDistance = ui->approach_input->text().toInt();
 
   // Set ROS parameters
-  ros::param::set("azimut_degree", azimut);
+  ros::param::set("azimuth_angle", azimut);
   ros::param::set("dive_angle", diveAngle);
-  ros::param::set("offset", offset);
+  ros::param::set("circle_offset", offset);
   ros::param::set("approach_distance", approachDistance);
 
   // Optional: Log the parameters to the console for debugging
@@ -77,11 +76,11 @@ void SavasanGui::onStartKamikazeButtonClicked()
            azimut, diveAngle, offset, approachDistance);
 
   ros::NodeHandle nh;
-  ros::ServiceClient client = nh.serviceClient<std_srvs::Empty>("/start_kamikaze");
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("/start_kamikaze");
 
 
   QtConcurrent::run([client]() mutable {
-    std_srvs::Empty srv;
+    std_srvs::Trigger srv;
     if (client.call(srv)) {
         ROS_INFO("Service /start_kamikaze called successfully.");
     } else {
@@ -122,13 +121,19 @@ void SavasanGui::handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg)
                        .arg(QString::fromStdString(msg->name))
                        .arg(QString::fromStdString(msg->msg));
 
-  if (QString::fromStdString(msg->name) == "/autonom_maneuver_node") {
+  if (QString::fromStdString(msg->name) == "/kamikaze_node") {
         ui->kamikaze_logs->append(logMessage);
         ui->kamikaze_logs->moveCursor(QTextCursor::End);
     }
   else if (QString::fromStdString(msg->name) == "/yolov8_node") {
-        ui->kamikaze_logs->append(logMessage);
+        ui->tracker_logger->append(logMessage);
         ui->tracker_logger->moveCursor(QTextCursor::End);
+  }
+  else if(QString::fromStdString(msg->name) == "/comm_node"){
+        ui->tracker_logger->append(logMessage);
+        ui->tracker_logger->moveCursor(QTextCursor::End);
+        ui->kamikaze_logs->append(logMessage);
+        ui->kamikaze_logs->moveCursor(QTextCursor::End);
   }
   else {
     ui->general_log->append(logMessage);
@@ -136,12 +141,6 @@ void SavasanGui::handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg)
   }
 }
 
-void SavasanGui::onAltitudeSliderChanged(int value)
-{
-  // Handle the altitude slider value change
-  ROS_INFO("Daha implement etmedim kral");
-
-}
 
 void sendcommandint(int command, int param1, int param2, int param3, int param4,int x,int y,int z){
     ros::NodeHandle nh2;
@@ -168,16 +167,6 @@ void sendcommandint(int command, int param1, int param2, int param3, int param4,
             ROS_ERROR("Failed to send command.");
         };
 }
-
-void SavasanGui::onSpeedSliderChanged(int value)
-{
-  // Handle the speed slider value change
-  ROS_INFO("Speed slider changed to: %d", value);
-
-  sendcommandint(178,0,value,0,0,0,0,0);
-}
-
-
 
 
 void SavasanGui::on_startGpsTracking_clicked()

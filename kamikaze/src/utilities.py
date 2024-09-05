@@ -6,6 +6,7 @@ import tf.transformations as tf_trans
 import numpy as np
 import cv2
 from geometry_msgs.msg import Quaternion
+from pyproj import CRS, Transformer,Proj,transform
 import rospy
 
 
@@ -173,6 +174,20 @@ def calculate_waypoint_sequence(current_lat, current_lon, current_alt, target_la
     ]
     return waypoints
 
+def enu_to_geodetic(east, north, up, origin_lat, origin_lon, origin_alt):
+    # Define the projection system for ENU
+    transformer = Transformer.from_crs("EPSG:4978", "EPSG:4326", always_xy=True)
+    
+    # Convert origin from geodetic to ECEF
+    origin_ecef = transformer.transform(origin_lon, origin_lat, origin_alt)
+
+    # Use the ENU to ECEF conversion equations
+    # For simplicity, we'll assume a flat Earth approximation here.
+    lat = origin_lat + north / 111000  # Approximate conversion (1 degree latitude ~ 111 km)
+    lon = origin_lon + east / (111000 * math.cos(math.radians(origin_lat)))  # Approximate conversion
+    alt = origin_alt + up
+
+    return lat, lon, alt
 
 def calculate_waypoint(latitude, longitude, distance, bearing):
     """
@@ -304,3 +319,27 @@ def set_params_for_safe_fly():
             rospy.loginfo(f"Service response: {response}")
         except rospy.ServiceException as e:
             rospy.logerr(f"Service call failed: {e}")
+
+
+def calculate_coordinates(radius, azimuth_angle):
+
+    if 0 <= azimuth_angle <= 90:
+        new_azimuth_angle_rad = math.radians(azimuth_angle)
+        y = math.cos(new_azimuth_angle_rad) * radius
+        x = math.sin(new_azimuth_angle_rad) * radius
+    elif 90 < azimuth_angle <= 180:
+        new_azimuth_angle_rad = math.radians(180 - azimuth_angle)
+        y = -math.cos(new_azimuth_angle_rad) * radius
+        x =  math.sin(new_azimuth_angle_rad) * radius
+    elif 180 < azimuth_angle <= 270:
+        new_azimuth_angle_rad = math.radians(270 - azimuth_angle)
+        x = -math.cos(new_azimuth_angle_rad) * radius
+        y = -math.sin(new_azimuth_angle_rad) * radius
+    elif 270 < azimuth_angle <= 360:
+        new_azimuth_angle_rad = math.radians(360 - azimuth_angle)
+        y = math.cos(new_azimuth_angle_rad) * radius
+        x = -math.sin(new_azimuth_angle_rad) * radius
+    if abs(x) < 1e-10:  
+        x = 0
+
+    return x, y

@@ -49,7 +49,7 @@ class VideoSaveNode:
                 rospy.loginfo(f"Stopped recording. Video saved as {self.video_filename}")
                 self.video_writer = None  # Reset video writer for the next recording session
             return TriggerResponse(success=1)
-        except e:
+        except rospy.ServiceException as e:
             rospy.logerr(e)
             return TriggerResponse(success=0)
 

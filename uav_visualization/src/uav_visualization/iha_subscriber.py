@@ -15,6 +15,8 @@ a = 6378137.0         # Semi-major axis
 f = 1 / 298.257223563 # Flattening
 e2 = 2*f - f**2  
 
+
+#TODO: the home point is wrong
 def geodetic_to_enu(lat, lon, alt):
 
     lat_ref =  36.93824690
