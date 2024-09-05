@@ -1,23 +1,24 @@
 #!/usr/bin/env python
 
-
+from unittest import result
 import rospy
-import threading
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix, TimeReference
 from nav_msgs.msg import Odometry
+from server_comm.srv._gethss import gethssResponse
 from std_msgs.msg import Float64, Bool, String
 from std_srvs.srv import Trigger
-from server_comm.msg import Kilitlenme
-from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse
+from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse, gethss
+
 
 from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
 import requests
-from server_comm.msg import KonumBilgileri, KonumBilgisi
+from server_comm.msg import KonumBilgileri, KonumBilgisi, Kilitlenme, HavaSavunmaKoordinatlari, HavaSavunmaKoordinati
 
 from utils import quaternion_to_euler, calculate_speed, unix_to_utc_formatted
 
 from image_processor.msg import Yolo_xywh
+import threading
 
 
 class Comm_Node:
@@ -38,12 +39,13 @@ class Comm_Node:
             "/comm_node/api/kamikaze_bilgisi"
         )
 
+        self.get_hss_coordinate_message = rospy.Service(
+            "get_hss_coordinate_message", gethss, self.parse_and_publish_hss_coordinates_callback)
+
         self.send_lock_message = rospy.Service(
-            "send_lock_message", sendlock, self.send_lock_callback
-        )
+            "send_lock_message", sendlock, self.send_lock_callback)
         self.send_qr_message = rospy.Service(
-            "send_qr_message", sendqr, self.send_qr_callback
-        )
+            "send_qr_message", sendqr, self.send_qr_callback)
 
         self.imu = None
         self.battery = None
@@ -82,7 +84,7 @@ class Comm_Node:
             self.bbox_sub = rospy.Subscriber(
                 "/yolov8/xywh", Yolo_xywh, self.bbox_callback
             )
-
+            
             self.fcu_time_sub = rospy.Subscriber(
                 "/mavros/time_reference", TimeReference, self.fcu_time_callback
             )
@@ -96,6 +98,8 @@ class Comm_Node:
         self.konum_pub = rospy.Publisher(
             "/konum_bilgileri", KonumBilgileri, queue_size=10
         )
+        self.hss_coordinate_pub = rospy.Publisher(
+            "/hss_coordinates", HavaSavunmaKoordinatlari)
 
         # Create a thread for sending telemetry data
         self.telemetry_thread = threading.Thread(target=self.send_telem_loop)
@@ -110,6 +114,48 @@ class Comm_Node:
         while not rospy.is_shutdown():
             self.sent_telem()
             rate.sleep()
+
+    def get_hss_coordinates(self):
+        try:
+            url = f'{self.base_url}/hss_koordinatlari'
+            response = self.session.get(url)
+            if response.status_code == 200:
+                response.json().get('hss_koordinat_bilgileri')
+                rospy.loginfo(
+                    f"Air defense coordinates retrieved successfully")
+                return gethssResponse(success=1, result=response.status_code)
+            else:
+                rospy.logerr(
+                    f"Failed to retrieve air defense coordinates, status code: {response.status_code}")
+                return gethssResponse(success=0, result=response.status_code)
+        except Exception as e:
+            rospy.logerr(
+                f"An error occurred while retrieving air defense coordinates: {str(e)}")
+            return gethssResponse(success=0, result=response.status_code)
+
+    def parse_and_publish_hss_coordinates_callback(self, data_callback):
+        try:
+            response_json = self.get_hss_coordinates()
+            hss_koordinatlari_msg = HavaSavunmaKoordinatlari()
+            hss_coordinate_data = response_json.get(
+                "HavaSavunmaKoordinatlari", [])
+
+            for item in hss_coordinate_data:
+                hss_coordinate = HavaSavunmaKoordinati()
+                hss_coordinate.id = item["id"]
+                hss_coordinate.hssEnlem = item["hssEnlem"]
+                hss_coordinate.hssBoylam = item["hssBoylam"]
+                hss_coordinate.hssYaricap = item["hssYaricap"]
+
+                hss_koordinatlari_msg.hss_Koordinati.append(hss_coordinate)
+
+            self.hss_coordinate_pub.publish(hss_koordinatlari_msg)
+            rospy.loginfo("Published hss_Koordinati message.")
+
+        except Exception as e:
+            rospy.logerr(
+                f"An error occurred while parsing and publishing hss_Koordinati: {str(e)}"
+            )
 
     def send_lock_callback(self, data_calback):
 
@@ -190,6 +236,13 @@ class Comm_Node:
         self.fcu_time = msg.time_ref.secs
         self.fcu_time_nsecs = msg.time_ref.nsecs
 
+    def bbox_callback(self, msg):
+        self.bbox = msg
+        self.bbox_x = msg.x
+        self.bbox_y = msg.y
+        self.bbox_w = msg.w
+        self.bbox_h = msg.h
+
     def kilit_callback(self, msg):
         if msg:
             self.kilit = 1
@@ -198,8 +251,11 @@ class Comm_Node:
 
     def login(self):
         url = f"{self.base_url}/giris"
+        headers = {"Content-Type": "application/json",
+                   "Accept": "application/json"}
         data = {"kadi": self.username, "sifre": self.password}
-        response = self.session.post(url, json=data, headers=self.header, timeout=10)
+        response = self.session.post(
+            url, json=data, headers=headers, timeout=10)
         if response.status_code == 200:
             print("Login successful!")
             print(response.json())
@@ -270,6 +326,7 @@ class Comm_Node:
                 IHA_otonom = 0
             else:
                 IHA_otonom = 1
+                IHA_otonom = 1
         except:
 
             rospy.logerr(f"mode secerken hata{self.state}")
@@ -324,7 +381,6 @@ class Comm_Node:
 
         except Exception as e:
             rospy.logerr(f"An error occurred in process_data: {e}")
-
 
 if __name__ == "__main__":
     rospy.init_node("comm_node", anonymous=True)
