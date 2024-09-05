@@ -10,3 +10,5 @@ yolov8/src/yolov8/__pycache__/PID.cpython-38.pyc
 savasan_general/launch/apm_config.yaml
 savasan_general/launch/apm_config.yaml
 /template_gui_package/build/
+kamikaze/src/__pycache__/QR_node.cpython-38.pyc
+kamikaze/src/__pycache__/utilities.cpython-38.pyc
