@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
+from unittest import result
 import rospy
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix, TimeReference
 from nav_msgs.msg import Odometry
+from server_comm.srv._gethss import gethssResponse
 from std_msgs.msg import Float64, Bool, String
 from std_srvs.srv import Trigger
 from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse, gethss
@@ -90,8 +92,6 @@ class Comm_Node:
             self.bbox_sub = rospy.Subscriber(
                 "/yolov8/xywh", Yolo_xywh, self.bbox_callback
             )
-            self.qr_sub = rospy.Subscriber(
-                "/qr_code_data", String, self.qr_callback)
             self.fcu_time_sub = rospy.Subscriber(
                 "/mavros/time_reference", TimeReference, self.fcu_time_callback
             )
@@ -130,18 +130,18 @@ class Comm_Node:
             url = f'{self.base_url}/hss_koordinatlari'
             response = self.session.get(url)
             if response.status_code == 200:
-                coordinate_data = response.json().get('hss_koordinat_bilgileri')
+                response.json().get('hss_koordinat_bilgileri')
                 rospy.loginfo(
                     f"Air defense coordinates retrieved successfully")
-                return coordinate_data
+                return gethssResponse(success=1, result=response.status_code)
             else:
                 rospy.logerr(
                     f"Failed to retrieve air defense coordinates, status code: {response.status_code}")
-                return None
+                return gethssResponse(success=0, result=response.status_code)
         except Exception as e:
             rospy.logerr(
                 f"An error occurred while retrieving air defense coordinates: {str(e)}")
-            return None
+            return gethssResponse(success=0, result=response.status_code)
 
     def parse_and_publish_hss_coordinates_callback(self, data_callback):
         try:
@@ -217,27 +217,21 @@ class Comm_Node:
 
     def imu_callback(self, msg):
         self.imu = msg
-        self.process_data()
 
     def battery_callback(self, msg):
         self.battery = msg
-        self.process_data()
 
     def rel_altitude_callback(self, msg):
         self.rel_alt = msg
-        self.process_data()
 
     def position_callback(self, msg):
         self.position = msg
-        self.process_data()
 
     def speed_callback(self, msg):
         self.speed = msg
-        self.process_data()
 
     def state_callback(self, msg):
         self.state = msg
-        self.process_data()
 
     def fcu_time_callback(self, msg):
         self.fcu_time = msg.time_ref.secs
@@ -249,11 +243,9 @@ class Comm_Node:
         self.bbox_y = msg.y
         self.bbox_w = msg.w
         self.bbox_h = msg.h
-        self.process_data()
 
     def kilit_callback(self, msg):
         self.kilit = msg
-        self.process_data()
 
     def login(self):
         url = f"{self.base_url}/giris"
@@ -311,9 +303,9 @@ class Comm_Node:
                 "iha_yonelme": yaw,
                 "iha_yatis": roll,
                 "iha_hizi": calculate_speed(
-                                    self.speed.twist.linear.x,
-                                    self.speed.twist.linear.y,
-                                    ),
+                    self.speed.twist.linear.x,
+                    self.speed.twist.linear.y,
+                ),
                 "iha_batarya": int(self.battery.percentage * 100),
                 "iha_otonom": IHA_otonom,
                 "iha_kilitlenme": int(self.kilit),
