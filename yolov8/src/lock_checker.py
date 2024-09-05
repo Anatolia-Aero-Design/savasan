@@ -9,8 +9,8 @@ from std_msgs.msg import Bool
 import time
 
 from test import send_lock_on_info
-# from server_comm.srv import sendlock, sendlockRequest
-# from server_comm.msg import Kilitlenme
+from server_comm.srv import sendlock, sendlockRequest
+from server_comm.msg import Kilitlenme
 
 
 class Timer:
@@ -71,8 +71,6 @@ class Lock_Checker:
         self.xywh_sub = rospy.Subscriber(
             "/yolov8/xywh", Yolo_xywh, self.bbox_callback)
 
-        self.lock_on_pub = rospy.Publisher(
-            "/lock_on_status", Bool, queue_size=60)
         self.kilit_pub = rospy.Publisher("/kilit", Bool, queue_size=60)
 
         # Draw target area
@@ -107,8 +105,8 @@ class Lock_Checker:
         lock_on_status, kilit = self.lock_on_status(
             proportions, self.lock_on_controller, self.kilit_controller
         )
-
-        self.kilit_pub.publish(self.send_lock_on_info(kilit, lock_on_status))
+        self.send_lock_on_info(kilit, lock_on_status)
+        self.kilit_pub.publish(kilit)
 
     # Calculate bounding box proportion to the target area
     def calculate_lock_on_proportion(self, target_coordinates, bbox_coordinates):
@@ -163,45 +161,27 @@ class Lock_Checker:
         if lock_on_msg == True and self.kilitlenme_data_sent == False:
             self.end_time = self.timer.get_current_time()
             try:
-                data_dict = {
-                    "kilitlenmeBaslangicZamani": {
-                        "hour": self.start_time[0],
-                        "minute": self.start_time[1],
-                        "second": self.start_time[2],
-                        "millisecond": self.start_time[3]
-                    },
-                    "kilitlenmeBitisZamani": {
-                        "hour": self.end_time[0],
-                        "minute": self.end_time[1],
-                        "second": self.end_time[2],
-                        "millisecond": self.end_time[3]
-                    },
-                    "otonom_kilitlenme": 1
-                }
+                rospy.wait_for_service("/send_lock_message")
+                send_lock_message = rospy.ServiceProxy("/send_lock_message", sendlock)
+                response = send_lock_message(Kilitlenme{start_hour= self.start_time[0]
+                                                        start_min= self.start_time[1]
+                                                        start_second= self.start_time[2]
+                                                        start_milisecond= self.start_time[3]
+                                                        stop_hour= self.end_time[0]
+                                                        stop_min= self.end_time[1]
+                                                        stop_second= self.end_time[2]
+                                                        stop_milisecond= self.end_time[3]
+                                                        otonom= 1})
             except Exception as e:
                 rospy.logerr(
                     f"An error occurred while creating lock-on data: {str(e)}")
-        return data_dict
+        return response
 
 
 if __name__ == "__main__":
     rospy.init_node("lock_checker_node", anonymous=True)
     lock_checker_node = Lock_Checker()
-    format_data = lock_checker_node.send_lock_on_info
-    rospy.wait_for_service("/send_lock_message")
-    '''send_lock_message = rospy.ServiceProxy("/send_lock_message", sendlock)
-    response = send_lock_message(Kilitlenme{
-                                start_hour =       format_data["kilitlenmeBaslangicZamani"]["hour"]
-                                start_min =        format_data["kilitlenmeBaslangicZamani"]["minute"]
-                                start_second =     format_data["kilitlenmeBaslangicZamani"]["second"]
-                                start_milisecond = format_data["kilitlenmeBaslangicZamani"]["milisecond"]
-                                stop_hour =        format_data["kilitlenmeBitisZamani"]["hour"]
-                                stop_min =         format_data["kilitlenmeBitisZamani"]["minute"]
-                                stop_second =      format_data["kilitlenmeBitisZamani"]["second"]
-                                stop_milisecond =  format_data["kilitlenmeBitisZamani"]["milisecond"]
-                                otonom =           format_data["otonom_kilitlenme"]})
 
-    print(response)'''
     try:
         rospy.spin()
     except KeyboardInterrupt:
