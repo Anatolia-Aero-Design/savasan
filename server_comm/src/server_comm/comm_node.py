@@ -297,7 +297,6 @@ class Comm_Node:
                 return  # or set default values for roll, pitch, yaw
         except Exception as e:
             rospy.logerr(f"Error processing IMU data: {e}")
-            
 
             # Prepare data dictionary
             data_dict = {
