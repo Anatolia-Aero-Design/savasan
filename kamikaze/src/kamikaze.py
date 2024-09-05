@@ -32,11 +32,7 @@ class UAVWaypointManager:
         # Flight parameters
         self.road_distance = 300
 
-        # Load parameters from ROS parameter server
-        self.azimuth_angle = rospy.get_param("azimuth_angle", 0.0)  
-        self.dive_angle = math.radians(rospy.get_param("dive_angle", 30) )
-        self.approach_distance = rospy.get_param("approach_distance", 300)
-        self.circle_offset = rospy.get_param("circle_offset", 0)
+
 
         # ROS services and subscribers
         self.start_service = rospy.Service("start_kamikaze", Trigger, self.handle_start_mission)
@@ -79,23 +75,20 @@ class UAVWaypointManager:
         large_radius, small_radius = radii
         enu_coords = []
 
-        
-        
-
+        target_x,target_y = utils.calculate_coordinates(0+self.circle_offset, azimuth_angle)
         # Calculate ENU coordinates for the circular path
         for radius in [large_radius, small_radius]:
             x, y = utils.calculate_coordinates(radius, azimuth_angle)
-            enu_coords.append((x, y, altitude - self.target_altitude))
+            enu_coords.append((-x+target_x, -y+target_y, altitude - self.target_altitude))
             
-        target_x,target_y = utils.calculate_coordinates(0+self.circle_offset, azimuth_angle)
         enu_coords.append((target_x, target_y, self.target_altitude))
 
         # Calculate final exit point coordinates
         exit_x, exit_y = utils.calculate_coordinates(small_radius, azimuth_angle)
-        enu_coords.append((-exit_x, -exit_y, self.target_altitude+20))
+        enu_coords.append((exit_x+target_x, exit_y+target_y, self.target_altitude+20))
         
         exit_x2, exit_y2 = utils.calculate_coordinates(large_radius, azimuth_angle)
-        enu_coords.append((-exit_x2, -exit_y2, altitude - self.target_altitude))
+        enu_coords.append((exit_x2+target_x, exit_y2+target_y, altitude - self.target_altitude))
 
         # Convert ENU to geodetic coordinates
         geodetic_coords = []
@@ -148,7 +141,12 @@ class UAVWaypointManager:
         if self.uav_altitude is None:
             rospy.logerr("UAV altitude not available.")
             return TriggerResponse(success=False)
-
+        
+        self.azimuth_angle = rospy.get_param("azimuth_angle", 0.0)  
+        self.dive_angle = math.radians(rospy.get_param("dive_angle", 30) )
+        self.approach_distance = rospy.get_param("approach_distance", 300)
+        self.circle_offset = rospy.get_param("circle_offset", 0)
+        
         # Calculate the radii for waypoints
         radii = self.calculate_radii(self.uav_altitude, self.dive_angle)
 
