@@ -107,7 +107,6 @@ class ImageProcessorNode:
             elapsed_time = self.timer(frame)
             if elapsed_time >= 4.00:
                 lock_on_status = True
-                rospy.loginfo("Success")
 
             if elapsed_time > 0.00:
                 kilit = True

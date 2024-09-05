@@ -11,9 +11,9 @@ int main(int argc, char *argv[])
 
   SavasanGui w;
 
+
   // set the window title as the node name
   w.setWindowTitle(QString::fromStdString("Anatolia Aero Design Mission Controller"));
-
 
   w.show();
 

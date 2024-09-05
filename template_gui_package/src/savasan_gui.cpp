@@ -16,6 +16,7 @@ SavasanGui::SavasanGui(QWidget *parent) :
   ui->setupUi(this);
   ui->online_led->setText("  Offline");
 
+
   QPalette palette = ui->online_led->palette();
   palette.setColor(QPalette::WindowText, Qt::red);  // You can change Qt::red to any color you want
   ui->online_led->setPalette(palette);
@@ -23,8 +24,6 @@ SavasanGui::SavasanGui(QWidget *parent) :
   // Connect the button to the slot
   connect(ui->pushButton_3, &QPushButton::clicked, this, &SavasanGui::onStartKamikazeButtonClicked);
 
-  connect(ui->verticalSlider, &QSlider::valueChanged, this, &SavasanGui::onAltitudeSliderChanged);
-  connect(ui->horizontalSlider, &QSlider::valueChanged, this, &SavasanGui::onSpeedSliderChanged);
   connect(ui->startGpsTracking, &QPushButton::clicked, this, &SavasanGui::on_startGpsTracking_clicked);
   connect(ui->stopGpsTracking, &QPushButton::clicked, this, &SavasanGui::on_stopGpsTracking_clicked);
   connect(ui->startYolo, &QPushButton::clicked, this, &SavasanGui::on_startYolo_clicked);
