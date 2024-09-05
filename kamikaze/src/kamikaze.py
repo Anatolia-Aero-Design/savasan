@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 import rospy
-from mavros_msgs.msg import WaypointList, Waypoint,WaypointReached
+from mavros_msgs.msg import WaypointList, Waypoint, WaypointReached
 import datetime
 
 
-from mavros_msgs.srv import WaypointPush, WaypointClear, CommandLong,WaypointClear
+from mavros_msgs.srv import WaypointPush, WaypointClear, CommandLong, WaypointClear
 import math
 from std_srvs.srv import Trigger, TriggerResponse
 from std_msgs.msg import Float64
@@ -35,15 +35,13 @@ class UAVWaypointManager:
         self.target_latitude = float(rospy.get_param("/comm_node/Target_Lat"))
         self.target_longitude = float(rospy.get_param("/comm_node/Target_Lon"))
         self.target_altitude = float(rospy.get_param("/comm_node/Target_Alt"))
-        
 
         # Flight parameters
         self.road_distance = 300
 
-
-
         # ROS services and subscribers
-        self.start_service = rospy.Service("start_kamikaze", Trigger, self.handle_start_mission)
+        self.start_service = rospy.Service(
+            "start_kamikaze", Trigger, self.handle_start_mission)
         self.pose_subscriber = rospy.Subscriber(
             "/mavros/local_position/pose", PoseStamped, self.update_uav_pose
         )
@@ -53,9 +51,10 @@ class UAVWaypointManager:
         self.recv_wp_sub = rospy.Subscriber(
             "/mavros/mission/reached", WaypointReached, self.wp_reached_callback
         )
-    def wp_reached_callback(self,wp_data):
+
+    def wp_reached_callback(self, wp_data):
         self.last_rec_wp = wp_data.wp_seq
-        
+
     def update_uav_altitude(self, altitude_data):
         """Update the UAV altitude from the subscriber callback."""
         self.uav_altitude = float(altitude_data.data)
@@ -67,7 +66,7 @@ class UAVWaypointManager:
     def calculate_radii(self, altitude, dive_angle):
         """
         Calculate the radii for the waypoint circle based on altitude and dive angle.
-        
+
         :param altitude: The current altitude of the UAV.
         :param dive_angle: The dive angle in radians.
         :return: The larger and smaller radii of the circle.
@@ -88,25 +87,32 @@ class UAVWaypointManager:
         large_radius, small_radius = radii
         enu_coords = []
 
-        target_x,target_y = utils.calculate_coordinates(0+self.circle_offset, azimuth_angle)
+        target_x, target_y = utils.calculate_coordinates(
+            0+self.circle_offset, azimuth_angle)
         # Calculate ENU coordinates for the circular path
         for radius in [large_radius, small_radius]:
             x, y = utils.calculate_coordinates(radius, azimuth_angle)
-            enu_coords.append((-x+target_x, -y+target_y, altitude - self.target_altitude))
-            
+            enu_coords.append(
+                (-x+target_x, -y+target_y, altitude - self.target_altitude))
+
         enu_coords.append((target_x, target_y, self.target_altitude))
 
         # Calculate final exit point coordinates
-        exit_x, exit_y = utils.calculate_coordinates(small_radius, azimuth_angle)
-        enu_coords.append((exit_x+target_x, exit_y+target_y, self.target_altitude+20))
-        
-        exit_x2, exit_y2 = utils.calculate_coordinates(large_radius, azimuth_angle)
-        enu_coords.append((exit_x2+target_x, exit_y2+target_y, altitude - self.target_altitude))
+        exit_x, exit_y = utils.calculate_coordinates(
+            small_radius, azimuth_angle)
+        enu_coords.append(
+            (exit_x+target_x, exit_y+target_y, self.target_altitude+20))
+
+        exit_x2, exit_y2 = utils.calculate_coordinates(
+            large_radius, azimuth_angle)
+        enu_coords.append((exit_x2+target_x, exit_y2+target_y,
+                          altitude - self.target_altitude))
 
         # Convert ENU to geodetic coordinates
         geodetic_coords = []
         for east, north, up in enu_coords:
-            lat, lon, alt = utils.enu_to_geodetic(east, north, up, self.target_latitude, self.target_longitude, self.target_altitude)
+            lat, lon, alt = utils.enu_to_geodetic(
+                east, north, up, self.target_latitude, self.target_longitude, self.target_altitude)
             geodetic_coords.append((lat, lon, alt))
 
         return geodetic_coords
@@ -154,17 +160,18 @@ class UAVWaypointManager:
         if self.uav_altitude is None:
             rospy.logerr("UAV altitude not available.")
             return TriggerResponse(success=False)
-        
-        self.azimuth_angle = rospy.get_param("azimuth_angle", 0.0)  
-        self.dive_angle = math.radians(rospy.get_param("dive_angle", 30) )
+
+        self.azimuth_angle = rospy.get_param("azimuth_angle", 0.0)
+        self.dive_angle = math.radians(rospy.get_param("dive_angle", 30))
         self.approach_distance = rospy.get_param("approach_distance", 300)
         self.circle_offset = rospy.get_param("circle_offset", 0)
-        
+
         # Calculate the radii for waypoints
         radii = self.calculate_radii(self.uav_altitude, self.dive_angle)
 
         # Generate geodetic coordinates for the waypoint circle
-        geodetic_coords = self.calculate_waypoint_coordinates(radii, self.azimuth_angle, self.uav_altitude)
+        geodetic_coords = self.calculate_waypoint_coordinates(
+            radii, self.azimuth_angle, self.uav_altitude)
 
         # Generate waypoints from the coordinates
         waypoints = self.create_waypoints(geodetic_coords)
@@ -173,64 +180,67 @@ class UAVWaypointManager:
 
         rospy.wait_for_service('/mavros/mission/clear')
         try:
-            clear_wp = rospy.ServiceProxy('/mavros/mission/clear', WaypointClear)
+            clear_wp = rospy.ServiceProxy(
+                '/mavros/mission/clear', WaypointClear)
             response = clear_wp()
             if response.success:
                 rospy.loginfo("Waypoints successfully cleared.")
-                
+
             else:
                 rospy.logwarn("Failed to clear waypoints.")
-        
+
         except rospy.ServiceException as e:
             rospy.logerr("Service Clear Waypoint call failed: %s", e)
             return TriggerResponse(success=False)
-        
+
         rospy.wait_for_service('/mavros/mission/push')
         try:
-            waypoint_push_service = rospy.ServiceProxy('/mavros/mission/push', WaypointPush)
+            waypoint_push_service = rospy.ServiceProxy(
+                '/mavros/mission/push', WaypointPush)
             response = waypoint_push_service(0, waypoints.waypoints)
             rospy.loginfo("Waypoints successfully generated and pushed.")
-            
+
         except rospy.ServiceException as e:
             rospy.logerr("Waypoints generated and pushed Failed: %s", e)
             return TriggerResponse(success=False)
 
         self.last_rec_wp = 1
         rospy.loginfo("Mission is Loaded waiting for Auto Mode:")
-        
+
         qr_text = ""
         while 1:
-            
+
             if self.last_rec_wp == 2 and not self.kamikaze_started:
                 rospy.wait_for_service("/start_Qr")
                 qr_start = rospy.ServiceProxy('/start_Qr', Trigger)
-                try: 
+                try:
                     response = qr_start()
-                    #TODO: RESPONSE CHECK CAN BE ADD
+                    # TODO: RESPONSE CHECK CAN BE ADD
                     start_time = rospy.Time.now()
                     rospy.loginfo(f"KAMIKAZE STARTED AT: {start_time}")
                     self.kamikaze_started = True
                 except:
                     rospy.loginfo(f"Failed when qr start service call")
-                    
+
             if self.last_rec_wp == 4 and self.kamikaze_started:
-                
+
                 self.kamikaze_started = False
-                
+
                 rospy.wait_for_service("/stop_Qr")
                 qr_stop = rospy.ServiceProxy('/stop_Qr', Trigger)
-                try: 
+                try:
                     response = qr_stop()
                     stop_time = rospy.Time.now()
                     self.kamikaze_started = True
                     qr_text = response.message
                 except:
-                    rospy.loginfo(f"Failed when qr stop service call") 
+                    rospy.loginfo(f"Failed when qr stop service call")
                 time = rospy.Time.now()
-                rospy.loginfo(f"KAMIKAZE FINISHED AT: {stop_time}, QR text: {qr_text}")
-                  
+                rospy.loginfo(
+                    f"KAMIKAZE FINISHED AT: {stop_time}, QR text: {qr_text}")
+
                 if qr_text != "":
-                    
+
                     rospy.wait_for_service("/send_qr_message")
                     secs = start_time.to_sec()
                     time_in_datetime = datetime.datetime.fromtimestamp(secs)
@@ -238,18 +248,20 @@ class UAVWaypointManager:
                     start_hour = time_in_datetime.hour
                     start_min = time_in_datetime.minute
                     start_second = time_in_datetime.second
-                    start_millisecond = int(time_in_datetime.microsecond / 1000)
-                    
+                    start_millisecond = int(
+                        time_in_datetime.microsecond / 1000)
+
                     secs = stop_time.to_sec()
                     time_in_datetime = datetime.datetime.fromtimestamp(secs)
                     stop_hour = time_in_datetime.hour
                     stop_min = time_in_datetime.minute
                     stop_second = time_in_datetime.second
                     stop_millisecond = int(time_in_datetime.microsecond / 1000)
-                    
-                    send_lock_message = rospy.ServiceProxy('/send_qr_message', sendqr)
+
+                    send_lock_message = rospy.ServiceProxy(
+                        '/send_qr_message', sendqr)
                     response = send_lock_message(Qr(start_hour=start_hour,
-                                                    start_min = start_min,
+                                                    start_min=start_min,
                                                     start_second=start_second,
                                                     start_milisecond=start_millisecond,
                                                     stop_hour=stop_hour,
@@ -257,18 +269,9 @@ class UAVWaypointManager:
                                                     stop_second=stop_second,
                                                     stop_milisecond=stop_millisecond,
                                                     qr_text=qr_text))
-                    print(response)
                     return TriggerResponse(success=True)
                 else:
                     return TriggerResponse(success=False)
-                
-            
-                
-        
-        
-        
-        
-        
 
 
 if __name__ == '__main__':
