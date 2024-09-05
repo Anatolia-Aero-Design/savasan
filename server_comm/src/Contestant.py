@@ -7,15 +7,15 @@ class Contestant():
    
     def update(self,json_data):
         self.id = json_data['takim_numarasi']
-        self.lat = json_data['IHA_enlem']
-        self.lon = json_data['IHA_boylam']
-        self.altitude = json_data['IHA_irtifa']
-        self.pitch = json_data['IHA_dikilme']
-        self.roll = json_data['IHA_yonelme']
-        self.yaw = json_data['IHA_yatis']
-        self.speed = json_data['IHA_hiz']
-        self.battery = json_data['IHA_batarya']
-        self.otonom = json_data['IHA_otonom']
+        self.lat = json_data['iha_enlem']
+        self.lon = json_data['iha_boylam']
+        self.altitude = json_data['iha_irtifa']
+        self.pitch = json_data['iha_dikilme']
+        self.roll = json_data['iha_yonelme']
+        self.yaw = json_data['iha_yatis']
+        self.speed = json_data['iha_hizi']
+        self.battery = json_data['iha_batarya']
+        self.otonom = json_data['iha_otonom']
         self.kilitlenme = json_data['iha_kilitlenme']
         self.merkez_X = json_data['hedef_merkez_X']
         self.merkez_Y = json_data['hedef_merkez_Y']
@@ -24,16 +24,17 @@ class Contestant():
         time.sleep(1)
         
     def get_info(self):
+        print(self.id)
         response = {
             "takim_numarasi" : self.id , 
-            "IHA_enlem" : self.lat ,
-            "IHA_boylam" : self.lon ,
-            "IHA_irtifa" : self.altitude ,
-            "IHA_dikilme" : self.pitch ,
-            "IHA_yonelme" : self.yaw ,
-            "IHA_yatis" : self.roll ,
-            "IHA_hiz" : self.speed,
-            "IHA_zamanfarki" : 0 ,
+            "iha_enlem" : self.lat ,
+            "iha_boylam" : self.lon ,
+            "iha_irtifa" : self.altitude ,
+            "iha_dikilme" : self.pitch ,
+            "iha_yonelme" : self.yaw ,
+            "iha_yatis" : self.roll ,
+            "iha_hizi" : self.speed,
+            "zaman_farki" : 0 ,
         }
         return response
     

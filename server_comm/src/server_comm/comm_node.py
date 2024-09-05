@@ -26,7 +26,7 @@ class Comm_Node:
         self.base_url = "http://savasaniha.baykartech.com/api"
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
-        self.team_number = None
+        self.team_number = 31
         self.header = {"Content-Type": "application/json",
                        "Accept": "application/json"}
 
@@ -309,7 +309,7 @@ class Comm_Node:
                 "iha_dikilme": pitch,
                 "iha_yonelme": yaw,
                 "iha_yatis": roll,
-                "iha_hiz": calculate_speed(
+                "iha_hizi": calculate_speed(
                                     self.speed.twist.linear.x,
                                     self.speed.twist.linear.y,
                                     ),
@@ -342,7 +342,7 @@ class Comm_Node:
 if __name__ == "__main__":
     rospy.init_node("comm_node", anonymous=True)
     comm_node = Comm_Node()
-    comm_node.login()  # perform login
+    # comm_node.login()  # perform login
     comm_node.start_telem_loop()
     try:
         rospy.spin()
