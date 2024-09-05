@@ -15,14 +15,18 @@ find_package(catkin REQUIRED COMPONENTS
 # Add message files
 add_message_files(
   FILES
+  Qr.msg
+  Kilitlenme.msg
   KonumBilgisi.msg
   KonumBilgileri.msg
 )
 
 # Add service files if any
-# add_service_files(
-#   FILES
-# )
+add_service_files(
+  FILES
+  sendlock.srv
+  sendqr.srv
+)
 
 # Generate added messages and services with any dependencies listed here
 generate_messages(

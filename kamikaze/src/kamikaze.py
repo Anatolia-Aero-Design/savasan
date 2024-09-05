@@ -1,13 +1,18 @@
 #!/usr/bin/env python
 
 import rospy
-from mavros_msgs.msg import WaypointList, Waypoint
+from mavros_msgs.msg import WaypointList, Waypoint,WaypointReached
+import datetime
+
+
 from mavros_msgs.srv import WaypointPush, WaypointClear, CommandLong,WaypointClear
 import math
 from std_srvs.srv import Trigger, TriggerResponse
 from std_msgs.msg import Float64
 import utilities as utils
 from geometry_msgs.msg import PoseStamped
+from server_comm.srv import sendqr
+from server_comm.msg import Qr
 from QR_node import QR_Node
 import numpy as np
 
@@ -18,6 +23,8 @@ class UAVWaypointManager:
         # UAV state
         self.uav_altitude = None
         self.uav_position = None
+        self.kamikaze_started = False
+        self.qr_started = False
 
         # Home coordinates
         self.home_latitude = float(rospy.get_param("/comm_node/Home_Lat"))
@@ -43,7 +50,12 @@ class UAVWaypointManager:
         self.altitude_subscriber = rospy.Subscriber(
             "/mavros/global_position/rel_alt", Float64, self.update_uav_altitude
         )
-
+        self.recv_wp_sub = rospy.Subscriber(
+            "/mavros/mission/reached", WaypointReached, self.wp_reached_callback
+        )
+    def wp_reached_callback(self,wp_data):
+        self.last_rec_wp = wp_data.wp_seq
+        
     def update_uav_altitude(self, altitude_data):
         """Update the UAV altitude from the subscriber callback."""
         self.uav_altitude = float(altitude_data.data)
@@ -183,11 +195,79 @@ class UAVWaypointManager:
             rospy.logerr("Waypoints generated and pushed Failed: %s", e)
             return TriggerResponse(success=False)
 
+        self.last_rec_wp = 1
+        rospy.loginfo("Mission is Loaded waiting for Auto Mode:")
+        
+        qr_text = ""
+        while 1:
+            
+            if self.last_rec_wp == 2 and not self.kamikaze_started:
+                rospy.wait_for_service("/start_Qr")
+                qr_start = rospy.ServiceProxy('/start_Qr', Trigger)
+                try: 
+                    response = qr_start()
+                    #TODO: RESPONSE CHECK CAN BE ADD
+                    start_time = rospy.Time.now()
+                    rospy.loginfo(f"KAMIKAZE STARTED AT: {start_time}")
+                    self.kamikaze_started = True
+                except:
+                    rospy.loginfo(f"Failed when qr start service call")
+                    
+            if self.last_rec_wp == 4 and self.kamikaze_started:
+                
+                self.kamikaze_started = False
+                
+                rospy.wait_for_service("/stop_Qr")
+                qr_stop = rospy.ServiceProxy('/stop_Qr', Trigger)
+                try: 
+                    response = qr_stop()
+                    stop_time = rospy.Time.now()
+                    self.kamikaze_started = True
+                    qr_text = response.message
+                except:
+                    rospy.loginfo(f"Failed when qr stop service call") 
+                time = rospy.Time.now()
+                rospy.loginfo(f"KAMIKAZE FINISHED AT: {stop_time}, QR text: {qr_text}")
+                  
+                if qr_text != "":
+                    
+                    rospy.wait_for_service("/send_qr_message")
+                    secs = start_time.to_sec()
+                    time_in_datetime = datetime.datetime.fromtimestamp(secs)
+
+                    start_hour = time_in_datetime.hour
+                    start_min = time_in_datetime.minute
+                    start_second = time_in_datetime.second
+                    start_millisecond = int(time_in_datetime.microsecond / 1000)
+                    
+                    secs = stop_time.to_sec()
+                    time_in_datetime = datetime.datetime.fromtimestamp(secs)
+                    stop_hour = time_in_datetime.hour
+                    stop_min = time_in_datetime.minute
+                    stop_second = time_in_datetime.second
+                    stop_millisecond = int(time_in_datetime.microsecond / 1000)
+                    
+                    send_lock_message = rospy.ServiceProxy('/send_qr_message', sendqr)
+                    response = send_lock_message(Qr(start_hour=start_hour,
+                                                    start_min = start_min,
+                                                    start_second=start_second,
+                                                    start_milisecond=start_millisecond,
+                                                    stop_hour=stop_hour,
+                                                    stop_min=stop_min,
+                                                    stop_second=stop_second,
+                                                    stop_milisecond=stop_millisecond,
+                                                    qr_text=qr_text))
+                    print(response)
+                    return TriggerResponse(success=True)
+                else:
+                    return TriggerResponse(success=False)
+                
+            
+                
         
         
         
         
-        return TriggerResponse(success=True)
         
 
 

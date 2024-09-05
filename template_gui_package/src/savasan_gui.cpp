@@ -121,13 +121,19 @@ void SavasanGui::handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg)
                        .arg(QString::fromStdString(msg->name))
                        .arg(QString::fromStdString(msg->msg));
 
-  if (QString::fromStdString(msg->name) == "/autonom_maneuver_node") {
+  if (QString::fromStdString(msg->name) == "/kamikaze_node") {
         ui->kamikaze_logs->append(logMessage);
         ui->kamikaze_logs->moveCursor(QTextCursor::End);
     }
   else if (QString::fromStdString(msg->name) == "/yolov8_node") {
-        ui->kamikaze_logs->append(logMessage);
+        ui->tracker_logger->append(logMessage);
         ui->tracker_logger->moveCursor(QTextCursor::End);
+  }
+  else if(QString::fromStdString(msg->name) == "/comm_node"){
+        ui->tracker_logger->append(logMessage);
+        ui->tracker_logger->moveCursor(QTextCursor::End);
+        ui->kamikaze_logs->append(logMessage);
+        ui->kamikaze_logs->moveCursor(QTextCursor::End);
   }
   else {
     ui->general_log->append(logMessage);
