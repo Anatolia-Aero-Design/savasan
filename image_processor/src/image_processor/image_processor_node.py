@@ -2,6 +2,7 @@
 
 import rospy
 from sensor_msgs.msg import Image
+from datetime import datetime
 from cv_bridge import CvBridge, CvBridgeError
 
 # Adjust this import based on your message definition
@@ -25,9 +26,6 @@ class ImageProcessorNode:
         # Adjust topic and message type
         self.bbox_sub = rospy.Subscriber(
             "/yolov8/xywh", Yolo_xywh, self.bbox_callback)
-        self.server_time_sub = rospy.Subscriber(
-            "/server_time", String, self.server_time_callback
-        )
 
         # Publisher for processed images
         self.image_pub = rospy.Publisher(
@@ -45,9 +43,6 @@ class ImageProcessorNode:
         self.bbox_w = msg.w
         self.bbox_h = msg.h
         # rospy.loginfo(f"Received bbox data: x={self.bbox_x}, y={self.bbox_y}, w={self.bbox_w}, h={self.bbox_h}")
-
-    def server_time_callback(self, msg):
-        self.server_time = msg.data
 
     def callback(self):
         try:
@@ -92,23 +87,24 @@ class ImageProcessorNode:
 
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")
+
     def overlay_server_time(self, frame):
-        if self.server_time:
-            server_time_text = str(self.server_time)
-            text_size, _ = cv2.getTextSize(
-                server_time_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2
-            )
-            text_x = int(frame.shape[1] - text_size[0] - 10)
-            text_y = int(text_size[1] + 10)
-            cv2.putText(
-                frame,
-                server_time_text,
-                (text_x, text_y),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (0, 0, 0),
-                2,
-            )
+        now = datetime.now()
+        formatted_time = f"{now.hour}:{now.minute}:{now.second}:{now.microsecond}"
+        text_size, _ = cv2.getTextSize(
+            formatted_time, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2
+        )
+        text_x = int(frame.shape[1] - text_size[0] - 10)
+        text_y = int(text_size[1] + 10)
+        cv2.putText(
+            frame,
+            formatted_time,
+            (text_x, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 0),
+            2,
+        )
 
 
 if __name__ == "__main__":
