@@ -27,7 +27,7 @@ class Comm_Node:
         self.base_url = "http://savasaniha.baykartech.com/api"
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
-        self.team_number = 69
+        self.team_number = 32
         self.header = {"Content-Type": "application/json",
                        "Accept": "application/json"}
 
