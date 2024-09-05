@@ -27,16 +27,13 @@ class Comm_Node:
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
         self.team_number = 31
-        self.header = {"Content-Type": "application/json",
-                       "Accept": "application/json"}
+        self.header = {"Content-Type": "application/json", "Accept": "application/json"}
 
         # Get server APIs from sim.launch params
         self.server_url_telemetri_gonder = rospy.get_param(
             "/comm_node/api/telemetri_gonder"
         )
-        self.server_url_sunucusaati = rospy.get_param(
-            "/comm_node/api/sunucusaati"
-        )
+        self.server_url_sunucusaati = rospy.get_param("/comm_node/api/sunucusaati")
         self.server_url_kamikaze_bilgisi = rospy.get_param(
             "/comm_node/api/kamikaze_bilgisi"
         )
@@ -62,11 +59,9 @@ class Comm_Node:
         self.bbox_w = 0
         self.bbox_h = 0
 
-
         try:
             # Initialize Subscribers
-            self.imu_sub = rospy.Subscriber(
-                "/mavros/imu/data", Imu, self.imu_callback)
+            self.imu_sub = rospy.Subscriber("/mavros/imu/data", Imu, self.imu_callback)
             self.battery_sub = rospy.Subscriber(
                 "/mavros/battery", BatteryState, self.battery_callback
             )
@@ -87,29 +82,26 @@ class Comm_Node:
             self.bbox_sub = rospy.Subscriber(
                 "/yolov8/xywh", Yolo_xywh, self.bbox_callback
             )
-            
+
             self.fcu_time_sub = rospy.Subscriber(
                 "/mavros/time_reference", TimeReference, self.fcu_time_callback
             )
-            self.kilit_sub = rospy.Subscriber(
-                "/kilit", Bool, self.kilit_callback)
-            self.speed_pub = rospy.Subscriber(
-                "/mavros/time_reference", TimeReference, self.speed_callback
-            )
+            self.kilit_sub = rospy.Subscriber("/kilit", Bool, self.kilit_callback)
 
         except Exception as e:
-            rospy.logerr(f"An error occurred in process_data: {str(e)}")
+            rospy.logerr(f"An error occurred in process_data: {e}")
 
         # Initialize Publishers
-        self.server_time_pub = rospy.Publisher(
-            "/server_time", String, queue_size=10)
+        self.server_time_pub = rospy.Publisher("/server_time", String, queue_size=10)
         self.konum_pub = rospy.Publisher(
             "/konum_bilgileri", KonumBilgileri, queue_size=10
         )
 
         # Create a thread for sending telemetry data
         self.telemetry_thread = threading.Thread(target=self.send_telem_loop)
-        self.telemetry_thread.daemon = True  # Ensure the thread will exit when the main program ends
+        # Ensure the thread will exit when the main program ends
+        self.telemetry_thread.daemon = True
+
     def start_telem_loop(self):
         self.telemetry_thread.start()
 
@@ -121,22 +113,23 @@ class Comm_Node:
 
     def send_lock_callback(self, data_calback):
 
-        data = {"kilitlenmeBaslangicZamani":
-                {"saat": data_calback.data.start_hour,
-                 "dakika": data_calback.data.start_min,
-                 "saniye": data_calback.data.start_second,
-                 "milisaniye": data_calback.data.start_milisecond
-                 },
-                "kilitlenmeBitisZamani":
-                    {"saat": data_calback.data.stop_hour,
-                     "dakika": data_calback.data.stop_min,
-                     "saniye": data_calback.data.stop_second,
-                     "milisaniye": data_calback.data.stop_milisecond
-                     },
-                "otonom_kilitlenme": data_calback.data.otonom}
-        url = f'{self.base_url}/kilitlenme_bilgisi'
-        response = self.session.post(
-            url, json=data, headers=self.header, timeout=10)
+        data = {
+            "kilitlenmeBaslangicZamani": {
+                "saat": data_calback.data.start_hour,
+                "dakika": data_calback.data.start_min,
+                "saniye": data_calback.data.start_second,
+                "milisaniye": data_calback.data.start_milisecond,
+            },
+            "kilitlenmeBitisZamani": {
+                "saat": data_calback.data.stop_hour,
+                "dakika": data_calback.data.stop_min,
+                "saniye": data_calback.data.stop_second,
+                "milisaniye": data_calback.data.stop_milisecond,
+            },
+            "otonom_kilitlenme": data_calback.data.otonom,
+        }
+        url = f"{self.base_url}/kilitlenme_bilgisi"
+        response = self.session.post(url, json=data, headers=self.header, timeout=10)
 
         if response.status_code == 200:
             return sendlockResponse(success=1, result=response.status_code)
@@ -144,22 +137,23 @@ class Comm_Node:
 
     def send_qr_callback(self, data_calback):
 
-        data = {"kamikazeBaslangicZamani":
-                {"saat": data_calback.data.start_hour,
-                 "dakika": data_calback.data.start_min,
-                 "saniye": data_calback.data.start_second,
-                 "milisaniye": data_calback.data.start_milisecond
-                 },
-                "kamikazeBitisZamani":
-                    {"saat": data_calback.data.stop_hour,
-                     "dakika": data_calback.data.stop_min,
-                     "saniye": data_calback.data.stop_second,
-                     "milisaniye": data_calback.data.stop_milisecond
-                     },
-                "qrMetni": data_calback.data.qr_text}
-        url = f'{self.base_url}/kamikaze_bilgisi'
-        response = self.session.post(
-            url, json=data, headers=self.header, timeout=10)
+        data = {
+            "kamikazeBaslangicZamani": {
+                "saat": data_calback.data.start_hour,
+                "dakika": data_calback.data.start_min,
+                "saniye": data_calback.data.start_second,
+                "milisaniye": data_calback.data.start_milisecond,
+            },
+            "kamikazeBitisZamani": {
+                "saat": data_calback.data.stop_hour,
+                "dakika": data_calback.data.stop_min,
+                "saniye": data_calback.data.stop_second,
+                "milisaniye": data_calback.data.stop_milisecond,
+            },
+            "qrMetni": data_calback.data.qr_text,
+        }
+        url = f"{self.base_url}/kamikaze_bilgisi"
+        response = self.session.post(url, json=data, headers=self.header, timeout=10)
 
         if response.status_code == 200:
             rospy.loginfo("Qr Text send successfully to server")
@@ -168,7 +162,6 @@ class Comm_Node:
 
     def imu_callback(self, msg):
         self.imu = msg
-
 
     def bbox_callback(self, msg):
         self.bbox = msg
@@ -179,23 +172,19 @@ class Comm_Node:
 
     def battery_callback(self, msg):
         self.battery = msg
-        
 
     def rel_altitude_callback(self, msg):
         self.rel_alt = msg
-        
 
     def position_callback(self, msg):
         self.position = msg
-        
 
     def speed_callback(self, msg):
+
         self.speed = msg
-        
 
     def state_callback(self, msg):
         self.state = msg
-        
 
     def fcu_time_callback(self, msg):
         self.fcu_time = msg.time_ref.secs
@@ -206,13 +195,11 @@ class Comm_Node:
             self.kilit = 1
         else:
             self.kilit = 0
-        
 
     def login(self):
         url = f"{self.base_url}/giris"
         data = {"kadi": self.username, "sifre": self.password}
-        response = self.session.post(
-            url, json=data, headers=self.header, timeout=10)
+        response = self.session.post(url, json=data, headers=self.header, timeout=10)
         if response.status_code == 200:
             print("Login successful!")
             print(response.json())
@@ -221,7 +208,6 @@ class Comm_Node:
             print(f"Failed to login. Status code: {response.status_code}")
             print("Response:", response.text)
         return response
-
 
     def parse_and_publish_konumBilgileri(self, response_json):
         try:
@@ -251,12 +237,10 @@ class Comm_Node:
 
     def get_server_time(self):
         try:
-            response = self.session.get(
-                self.server_url_sunucusaati, timeout=10)
+            response = self.session.get(self.server_url_sunucusaati, timeout=10)
             if response.status_code == 200:
                 server_time = response.json()
-                rospy.loginfo(
-                    f"Server time retrieved successfully: {server_time}")
+                rospy.loginfo(f"Server time retrieved successfully: {server_time}")
                 time_str = f"{server_time['saat']}:{server_time['dakika']}:{server_time['saniye']}:{server_time['milisaniye']}"
                 self.server_time_pub.publish(time_str)
                 return time_str
@@ -266,12 +250,11 @@ class Comm_Node:
                 )
                 return None
         except Exception as e:
-            rospy.logerr(
-                f"An error occurred while retrieving server time: {str(e)}")
+            rospy.logerr(f"An error occurred while retrieving server time: {str(e)}")
             return None
 
     def sent_telem(self):
-        
+
         if not (
             self.imu
             and self.battery
@@ -286,19 +269,24 @@ class Comm_Node:
             if self.state.mode == "MANUAL" or self.state.mode == "FBWA":
                 IHA_otonom = 0
             else:
-                IHA_otonom = 1  
+                IHA_otonom = 1
         except:
-            
+
             rospy.logerr(f"mode secerken hata{self.state}")
             IHA_otonom = 0
         try:
-            # Convert quaternion to euler angles
-            roll, pitch, yaw = quaternion_to_euler(
-                self.imu.orientation.x,
-                self.imu.orientation.y,
-                self.imu.orientation.z,
-                self.imu.orientation.w,
-            )
+            try:
+                if self.imu is not None and hasattr(self.imu, "orientation"):
+                    roll, pitch, yaw = quaternion_to_euler(
+                        self.imu.orientation.x,
+                        self.imu.orientation.y,
+                        self.imu.orientation.z,
+                        self.imu.orientation.w,
+                    )
+                else:
+                    rospy.logwarn("IMU data is not available or incomplete.")
+            except Exception as e:
+                rospy.logerr(f"Error processing IMU data: {e}")
 
             # Prepare data dictionary
             data_dict = {
@@ -310,9 +298,9 @@ class Comm_Node:
                 "iha_yonelme": yaw,
                 "iha_yatis": roll,
                 "iha_hizi": calculate_speed(
-                                    self.speed.twist.linear.x,
-                                    self.speed.twist.linear.y,
-                                    ),
+                    self.speed.twist.linear.x,
+                    self.speed.twist.linear.y,
+                ),
                 "iha_batarya": int(self.battery.percentage * 100),
                 "iha_otonom": IHA_otonom,
                 "iha_kilitlenme": int(self.kilit),
@@ -320,7 +308,7 @@ class Comm_Node:
                 "hedef_merkez_Y": self.bbox_y,
                 "hedef_genislik": self.bbox_w,
                 "hedef_yukseklik": self.bbox_h,
-                "gps_saati": unix_to_utc_formatted(self.fcu_time, self.fcu_time_nsecs)
+                "gps_saati": unix_to_utc_formatted(self.fcu_time, self.fcu_time_nsecs),
             }
 
             # Send data to the server
@@ -332,12 +320,11 @@ class Comm_Node:
             if response.status_code == 200:
                 self.parse_and_publish_konumBilgileri(response.json())
             else:
-                rospy.logerr(
-                    f"Failed to send data, status code: {response}"
-                )
+                rospy.logerr(f"Failed to send data, status code: {response}")
 
         except Exception as e:
             rospy.logerr(f"An error occurred in process_data: {e}")
+
 
 if __name__ == "__main__":
     rospy.init_node("comm_node", anonymous=True)

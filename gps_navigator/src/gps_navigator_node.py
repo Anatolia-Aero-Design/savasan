@@ -3,8 +3,10 @@
 import rospy
 from server_comm.msg import KonumBilgileri
 from mavros_msgs.srv import CommandLong, CommandLongRequest
-from std_srvs.srv import Empty, EmptyResponse
+from std_srvs.srv import Trigger, TriggerResponse
 from mavros_msgs.srv import CommandInt
+from utils import haversine_formula
+
 
 class GPSNavigator:
     def __init__(self):
@@ -12,28 +14,25 @@ class GPSNavigator:
         self.gps_sub = None
         self.command_service = rospy.ServiceProxy('/mavros/cmd/command', CommandLong)
         
-        '''try:
-            self.target_id = rospy.get_param('Lorem_Ipsum') # param name will be inserted here from GUI
-        except KeyError as e:
-            rospy.logerr(f"Parameter not found!: {e}")'''
-        
+
         # Services to start and stop navigation
-        self.start_service = rospy.Service('start_navigation', Empty, self.start_navigation)
-        self.stop_service = rospy.Service('stop_navigation', Empty, self.stop_navigation)
+        self.start_service = rospy.Service('start_navigation', Trigger, self.start_navigation)
+        self.stop_service = rospy.Service('stop_navigation', Trigger, self.stop_navigation)
         
     def start_navigation(self, req):
+        self.target_id = rospy.get_param('/gps_navigator/target_id')
         if not self.navigation_active:
             self.gps_sub = rospy.Subscriber('/konum_bilgileri', KonumBilgileri, self.gps_callback)
             self.navigation_active = True
             print("Navigation started.")
-        return EmptyResponse()
+        return TriggerResponse(success=1)
 
     def stop_navigation(self, req):
         if self.navigation_active:
             self.gps_sub.unregister()
             self.navigation_active = False
             print("Navigation stopped.")
-        return EmptyResponse()
+        return TriggerResponse(success=1)
 
     def gps_callback(self, msg:KonumBilgileri):
         if not self.navigation_active:
@@ -48,7 +47,9 @@ class GPSNavigator:
                 longitude = target.IHA_boylam
                 altitude = target.IHA_irtifa
                 
+                #TODO: add carpisma onleyici
                 self.send_goto_command(latitude, longitude, altitude)
+                
             else:
                 rospy.logwarn(f"Team number {self.target_id} not found in the received data.")
         except Exception as e:
