@@ -11,16 +11,50 @@ import time
 
 
 class Timer:
-    def __init__(self) -> None:
+    def __init__(self):
         self.start_time = None
+        self.end_time = None
+        self.running = False
 
-    def timer(self):
-        if self.start_time is None:
+    def start(self):
+        if not self.running:
             self.start_time = time.time()
+            self.running = True
+            print("Chronometer started.")
+        else:
+            print("Chronometer is already running.")
 
-        elapsed_time = time.time() - self.start_time
-        return elapsed_time
+    def stop(self):
+        if self.running:
+            self.end_time = time.time()
+            self.running = False
+            elapsed_time = self.end_time - self.start_time
+            print(f"Chronometer stopped. Elapsed time: {self.format_time(elapsed_time)}")
+            return elapsed_time
+        else:
+            print("Chronometer is not running.")
+            return None
 
+    def reset(self):
+        self.start_time = None
+        self.end_time = None
+        self.running = False
+        print("Chronometer reset.")
+
+    def elapsed(self):
+        if self.running:
+            elapsed_time = time.time() - self.start_time
+            print(f"Elapsed time: {self.format_time(elapsed_time)}")
+            return elapsed_time
+        else:
+            print("Chronometer is not running.")
+            return None
+
+    @staticmethod
+    def format_time(seconds):
+        mins, secs = divmod(seconds, 60)
+        hours, mins = divmod(mins, 60)
+        return f"{int(hours):02}:{int(mins):02}:{secs:05.2f}"
 
 class Lock_Checker:
     def __init__(self) -> None:
@@ -101,7 +135,8 @@ class Lock_Checker:
 
     def lock_on_status(self, proportions, lock_on_status, kilit):
         if proportions[0] >= 0.93 and proportions[1] >= 0.93:
-            elapsed_time = self.timer.timer()
+            start_time = self.timer.start()
+            elapsed_time = self.timer.elapsed()
             if elapsed_time >= 4.00:
                 lock_on_status = True
             if elapsed_time > 0.00:
@@ -109,7 +144,7 @@ class Lock_Checker:
             else:
                 kilit = False
         else:
-            self.start_time = None
+            self.timer.reset()
             lock_on_status = False
         return lock_on_status, kilit
 
@@ -156,14 +191,13 @@ class Lock_Checker:
                 rospy.logerr(
                     f"An error occurred while sending lock-on data: {str(e)}")
 
-    def get_current_time(self):
-        now = datetime.now()
-        return now.hour, now.minute, now.second, now.microsecond
+
 
 
 if __name__ == "__main__":
     rospy.init_node("lock_checker_node", anonymous=True)
     lock_checker_node = Lock_Checker()
+    lock_checker_node.lock_on_status()
     try:
         rospy.spin()
     except KeyboardInterrupt:
