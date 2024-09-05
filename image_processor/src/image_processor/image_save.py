@@ -5,9 +5,10 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from image_processor.msg import Yolo_xywh
 import cv2
-import message_filters
+import rospkg
 import time 
 from std_srvs.srv import Trigger, TriggerResponse
+import os
 
 class VideoSaveNode:
     def __init__(self):
@@ -21,9 +22,12 @@ class VideoSaveNode:
         current_time = time.localtime()
         file_name = f"{competition_no}_Anatolia_Aero_Design_{current_time.tm_mday}_0{current_time.tm_mon}_{current_time.tm_year}.avi"
         
+        
+        rospack = rospkg.RosPack()
+        package_path = rospack.get_path("image_processor")
+        self.video_filename = os.path.join(package_path, f"saved_videos/{file_name}")
         # Initialize video writer
         self.video_writer = None
-        self.video_filename = f"/home/auki/catkin_ws/src/savasan/{file_name}"
         self.fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         self.frame_width =  1280  # Update this with the actual width of your image
         self.frame_height = 720  # Update this with the actual height of your image
@@ -75,7 +79,7 @@ class VideoSaveNode:
     def shutdown(self):
         if self.video_writer is not None:
             self.video_writer.release()
-            rospy.loginfo(f"Video saved as {self.video_filename}")
+            rospy.loginfo(f"Video saved at {self.video_filename}")
 
 if __name__ == '__main__':
     rospy.init_node('VideoSaveNode', anonymous=True)
