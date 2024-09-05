@@ -28,6 +28,7 @@ class UAVWaypointManager:
         self.target_latitude = float(rospy.get_param("/comm_node/Target_Lat"))
         self.target_longitude = float(rospy.get_param("/comm_node/Target_Lon"))
         self.target_altitude = float(rospy.get_param("/comm_node/Target_Alt"))
+        
 
         # Flight parameters
         self.road_distance = 300
