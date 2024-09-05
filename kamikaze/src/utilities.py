@@ -1,9 +1,14 @@
 import math
 from scipy.spatial.transform import Rotation as R
+from mavros_msgs.srv import ParamSetRequest,ParamSet,ParamGet,ParamGetRequest
+from mavros_msgs.msg import ParamValue
 import tf.transformations as tf_trans
 import numpy as np
 import cv2
 from geometry_msgs.msg import Quaternion
+from pyproj import CRS, Transformer,Proj,transform
+import rospy
+
 
 # Constant for Earth's radius in meters
 EARTH_RADIUS = 6371000
@@ -169,6 +174,20 @@ def calculate_waypoint_sequence(current_lat, current_lon, current_alt, target_la
     ]
     return waypoints
 
+def enu_to_geodetic(east, north, up, origin_lat, origin_lon, origin_alt):
+    # Define the projection system for ENU
+    transformer = Transformer.from_crs("EPSG:4978", "EPSG:4326", always_xy=True)
+    
+    # Convert origin from geodetic to ECEF
+    origin_ecef = transformer.transform(origin_lon, origin_lat, origin_alt)
+
+    # Use the ENU to ECEF conversion equations
+    # For simplicity, we'll assume a flat Earth approximation here.
+    lat = origin_lat + north / 111000  # Approximate conversion (1 degree latitude ~ 111 km)
+    lon = origin_lon + east / (111000 * math.cos(math.radians(origin_lat)))  # Approximate conversion
+    alt = origin_alt + up
+
+    return lat, lon, alt
 
 def calculate_waypoint(latitude, longitude, distance, bearing):
     """
@@ -242,3 +261,85 @@ def reduce_glare(image):
     # Apply Gaussian Blur and thresholding to reduce glare
     blurred = cv2.GaussianBlur(image, (5, 5), 0)
     return cv2.threshold(blurred, 200, 255, cv2.THRESH_BINARY)[1]
+
+def print_param():
+    param_list = ['PTCH_LIM_MIN_DEG', 'TECS_SINK_MAX']
+    
+    try:
+        service_proxy = rospy.ServiceProxy('/mavros/param/get', ParamGet)
+    except rospy.ServiceException as e:
+        rospy.logerr(f"Service call failed: {e}")
+    
+    for param in param_list:
+        try:
+            request = ParamGetRequest()
+            request.param_id = param 
+            response = service_proxy(request)
+            if response.success:
+                print(f"Parameter {param} has value: {response.value.real if response.value.real != 0 else response.value.integer}")
+            else:
+                rospy.logwarn(f"Failed to get parameter {param}")
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Service call failed: {e}")
+
+def set_params_for_dive():
+    rospy.wait_for_service('/mavros/param/set/')
+    param_list = ['PTCH_LIM_MIN_DEG','TECS_SINK_MAX']
+    value = [-50,20]
+    try:
+        service_proxy = rospy.ServiceProxy('/mavros/param/set/', ParamSet)
+    except rospy.ServiceException as e:
+        rospy.logerr(f"Service call failed: {e}")
+    for index, param in enumerate(param_list):
+        try:
+            request = ParamSetRequest()
+            request.param_id = param 
+            request.value = ParamValue(integer=value[index])
+            response = service_proxy(request)
+            rospy.loginfo(f"Service response: {response}")
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Service call failed: {e}")
+
+        
+
+def set_params_for_safe_fly():
+    rospy.wait_for_service('/mavros/param/set/')
+    param_list = ['PTCH_LIM_MIN_DEG','TECS_SINK_MAX']
+    value = [-20,5]
+    try:
+        service_proxy = rospy.ServiceProxy('/mavros/param/set/', ParamSet)
+    except rospy.ServiceException as e:
+        rospy.logerr(f"Service call failed: {e}")
+    for index, param in enumerate(param_list):
+        try:
+            request = ParamSetRequest()
+            request.param_id = param 
+            request.value = ParamValue(integer=value[index])
+            response = service_proxy(request)
+            rospy.loginfo(f"Service response: {response}")
+        except rospy.ServiceException as e:
+            rospy.logerr(f"Service call failed: {e}")
+
+
+def calculate_coordinates(radius, azimuth_angle):
+
+    if 0 <= azimuth_angle <= 90:
+        new_azimuth_angle_rad = math.radians(azimuth_angle)
+        y = math.cos(new_azimuth_angle_rad) * radius
+        x = math.sin(new_azimuth_angle_rad) * radius
+    elif 90 < azimuth_angle <= 180:
+        new_azimuth_angle_rad = math.radians(180 - azimuth_angle)
+        y = -math.cos(new_azimuth_angle_rad) * radius
+        x =  math.sin(new_azimuth_angle_rad) * radius
+    elif 180 < azimuth_angle <= 270:
+        new_azimuth_angle_rad = math.radians(270 - azimuth_angle)
+        x = -math.cos(new_azimuth_angle_rad) * radius
+        y = -math.sin(new_azimuth_angle_rad) * radius
+    elif 270 < azimuth_angle <= 360:
+        new_azimuth_angle_rad = math.radians(360 - azimuth_angle)
+        y = math.cos(new_azimuth_angle_rad) * radius
+        x = -math.sin(new_azimuth_angle_rad) * radius
+    if abs(x) < 1e-10:  
+        x = 0
+
+    return x, y

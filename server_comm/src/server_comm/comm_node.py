@@ -6,7 +6,10 @@ from flask import session
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix, TimeReference
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64, Bool, String
-from std_srvs.srv import Empty
+from std_srvs.srv import Trigger
+from server_comm.msg import Kilitlenme
+from server_comm.srv import sendlock, sendlockResponse,sendqr,sendqrResponse
+
 
 from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import State
@@ -27,6 +30,7 @@ class Comm_Node:
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
         self.team_number = None
+        self.header  = {"Content-Type": "application/json", "Accept": "application/json"}
 
         # Get server APIs from sim.launch params
         self.server_url_telemetri_gonder = rospy.get_param(
@@ -39,8 +43,11 @@ class Comm_Node:
         )
 
         self.abort_service = rospy.Service(
-            "stop_kamikaze", Empty, self.qr_check)
-
+            "stop_kamikaze", Trigger, self.qr_check)
+        
+        self.send_lock_message = rospy.Service("send_lock_message",sendlock,self.send_lock_callback)
+        self.send_qr_message = rospy.Service("send_qr_message",sendqr,self.send_qr_callback)
+        
         self.imu = None
         self.battery = None
         self.rel_alt = None
@@ -111,7 +118,54 @@ class Comm_Node:
             level=logging.DEBUG,
             format="%(asctime)s - %(levelname)s - %(message)s",
         )
+        
+    def send_lock_callback(self,data_calback):
 
+        data = {"kilitlenmeBaslangicZamani":
+                    {"saat": data_calback.data.start_hour,
+                    "dakika": data_calback.data.start_min,
+                    "saniye": data_calback.data.start_second,
+                    "milisaniye": data_calback.data.start_milisecond
+                    },
+                "kilitlenmeBitisZamani":
+                    { "saat": data_calback.data.stop_hour,
+                    "dakika": data_calback.data.stop_min,
+                    "saniye": data_calback.data.stop_second,
+                    "milisaniye": data_calback.data.stop_milisecond
+                    },
+                "otonom_kilitlenme": data_calback.data.otonom}
+        url = f'{self.base_url}/kilitlenme_bilgisi'
+        response = self.session.post(url, json=data, headers=self.header, timeout=10)
+        
+        if response.status_code == 200:
+            return   sendlockResponse(success = 1,result = response.status_code)
+        return   sendlockResponse(success = 0,result = response.status_code)
+
+    def send_qr_callback(self,data_calback):
+        
+
+        data = {"kilitlenmeBaslangicZamani":
+                    {"saat": data_calback.data.start_hour,
+                    "dakika": data_calback.data.start_min,
+                    "saniye": data_calback.data.start_second,
+                    "milisaniye": data_calback.data.start_milisecond
+                    },
+                "kilitlenmeBitisZamani":
+                    { "saat": data_calback.data.stop_hour,
+                    "dakika": data_calback.data.stop_min,
+                    "saniye": data_calback.data.stop_second,
+                    "milisaniye": data_calback.data.stop_milisecond
+                    },
+                "qrMetni": data_calback.data.qr_text}
+        print(data)
+        url = f'{self.base_url}/kamikaze_bilgisi'
+        response = self.session.post(url, json=data, headers=self.header, timeout=10)
+        
+        if response.status_code == 200:
+            rospy.loginfo("Qr Text send successfully to server")
+            return   sendqrResponse(success = 1,result = response.status_code)
+        return   sendqrResponse(success = 0,result = response.status_code)
+    
     def imu_callback(self, msg):
         self.imu = msg
         self.process_data()

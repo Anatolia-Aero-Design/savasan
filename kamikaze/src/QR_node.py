@@ -5,6 +5,7 @@ from sensor_msgs.msg import Image
 from mavros_msgs.msg import AttitudeTarget
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import String
+from std_srvs.srv import Trigger,TriggerResponse
 import utilities as utils
 from pyzbar.pyzbar import decode
 
@@ -12,16 +13,40 @@ class QR_Node:
     def __init__(self) -> None:
         self.bridge = CvBridge()    
         self.read = False 
-        self.qr_data = None
+        self.qr_data = ""
+        self.image_sub = None
         
-        # Initialize image subscriber
-        self.image_sub = rospy.Subscriber('camera/image_raw', Image, self.image_callback)
+
         # Initialize publishers 
         self.qr_pub = rospy.Publisher('/qr_code_data', String, queue_size=10)
         self.image_pub = rospy.Publisher('camera/kamikaze_image', Image, queue_size=60)
         self.attitude_pub = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         # Get server API as parameter
         self.server_url_kamikaze_bilgisi = rospy.get_param('/comm_node/api/kamikaze_bilgisi')
+        
+        # Services to start and stop tracking
+        self.start_service = rospy.Service(
+            'start_Qr', Trigger, self.start_qr)
+        self.stop_service = rospy.Service(
+            'stop_Qr', Trigger, self.stop_qr)
+    
+    def start_qr(self,req):
+        try:
+            if self.image_sub is None:
+                self.image_sub = rospy.Subscriber('camera/image_raw', Image, self.image_callback)
+                rospy.loginfo("Qr Reader started.")
+            return TriggerResponse(success=1)
+        except:
+            return TriggerResponse(success=0)
+    def stop_qr(self,req):
+        try:
+            if self.image_sub is not None:
+                self.image_sub.unregister()
+                self.image_sub = None
+                rospy.loginfo("Qr Reader stopped.")
+            return TriggerResponse(success=1,message=self.qr_data)
+        except:
+            return TriggerResponse(success=0)
     
     def read_check(self):
         return self.read

@@ -21,12 +21,24 @@ public:
 private slots:
   void onStartKamikazeButtonClicked();
   void handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg);
-  void onAltitudeSliderChanged(int value);  // Slot for altitude slider
-  void onSpeedSliderChanged(int value);
 
-  void on_verticalSlider_valueChanged(int value);
+  void on_startGpsTracking_clicked();
 
-  void on_verticalSlider_sliderMoved(int position);
+  void on_stopGpsTracking_clicked();
+
+  void on_startYolo_clicked();
+
+  void on_stopYolo_clicked();
+
+  void on_startCompetition_clicked();
+
+  void on_stopCompetition_clicked();
+
+  void on_UsePID_stateChanged(int arg1);
+
+  void on_startRecording_clicked();
+
+  void on_stopRecording_clicked();
 
 private:
   Ui::SavasanGui *ui;

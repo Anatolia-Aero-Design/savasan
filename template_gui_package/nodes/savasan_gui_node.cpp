@@ -1,6 +1,6 @@
 #include <QApplication>
-#include <QIcon>
 #include "savasan_gui.h"
+
 
 
 int main(int argc, char *argv[])
@@ -11,14 +11,12 @@ int main(int argc, char *argv[])
 
   SavasanGui w;
 
-  // set the window title as the node name
-  w.setWindowTitle(QString::fromStdString(
-                       ros::this_node::getName()));
 
-  // load the icon from our qrc file and set it as the application icon
-  QIcon icon(":/icons/my_gui_icon.png");
-  w.setWindowIcon(icon);
+  // set the window title as the node name
+  w.setWindowTitle(QString::fromStdString("Anatolia Aero Design Mission Controller"));
 
   w.show();
+
+
   return a.exec();
 }

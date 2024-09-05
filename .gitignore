@@ -2,8 +2,15 @@
 /image_handler/files/chase.mp4
 /yolov8/model/best_x.pt
 /image_handler/files/DSCF1821_2.mp4
+/kamikaze/src/__pycache__/
+/server_comm/src/server_comm/__pycache__/
+/kamikaze/src/__pycache__/
+yolov8/src/yolov8/__pycache__/PID.cpython-38.pyc
+1_Anatolia_Aero_Design_3_09_2024.avi
+savasan_general/launch/apm_config.yaml
+savasan_general/launch/apm_config.yaml
+/template_gui_package/build/
 kamikaze/src/__pycache__/QR_node.cpython-38.pyc
-server_comm/src/server_comm/__pycache__/utils.cpython-38.pyc
 kamikaze/src/__pycache__/utilities.cpython-38.pyc
 template_gui_package/test_ws.workspace.user
 yolov8/src/__pycache__/PID.cpython-38.pyc

@@ -92,7 +92,6 @@ class ImageProcessorNode:
 
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")
-
     def overlay_server_time(self, frame):
         if self.server_time:
             server_time_text = str(self.server_time)

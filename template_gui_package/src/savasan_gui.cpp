@@ -1,8 +1,10 @@
 #include "savasan_gui.h"
 #include "ui_savasan_gui.h"
 #include <QDebug>
+#include <QPalette>
 #include <ros/ros.h>
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 #include <QtConcurrent/QtConcurrent>
 #include <rosgraph_msgs/Log.h>
 #include <mavros_msgs/CommandInt.h>
@@ -12,13 +14,29 @@ SavasanGui::SavasanGui(QWidget *parent) :
   ui(new Ui::SavasanGui)
 {
   ui->setupUi(this);
+  ui->online_led->setText("  Offline");
+
+
+  QPalette palette = ui->online_led->palette();
+  palette.setColor(QPalette::WindowText, Qt::red);  // You can change Qt::red to any color you want
+  ui->online_led->setPalette(palette);
 
   // Connect the button to the slot
   connect(ui->pushButton_3, &QPushButton::clicked, this, &SavasanGui::onStartKamikazeButtonClicked);
 
-  connect(ui->verticalSlider, &QSlider::valueChanged, this, &SavasanGui::onAltitudeSliderChanged);
-  connect(ui->horizontalSlider, &QSlider::valueChanged, this, &SavasanGui::onSpeedSliderChanged);
+  connect(ui->startGpsTracking, &QPushButton::clicked, this, &SavasanGui::on_startGpsTracking_clicked);
+  connect(ui->stopGpsTracking, &QPushButton::clicked, this, &SavasanGui::on_stopGpsTracking_clicked);
+  connect(ui->startYolo, &QPushButton::clicked, this, &SavasanGui::on_startYolo_clicked);
+  connect(ui->stopYolo, &QPushButton::clicked, this, &SavasanGui::on_stopYolo_clicked);
+  connect(ui->startCompetition, &QPushButton::clicked, this, &SavasanGui::on_startCompetition_clicked);
+  connect(ui->stopCompetition, &QPushButton::clicked, this, &SavasanGui::on_stopCompetition_clicked);
+  connect(ui->startRecording, &QPushButton::clicked, this, &SavasanGui::on_startRecording_clicked);
+  connect(ui->stopRecording, &QPushButton::clicked, this, &SavasanGui::on_stopRecording_clicked);
+  connect(ui->UsePID, &QPushButton::clicked, this, &SavasanGui::on_UsePID_stateChanged);
 
+  int recording_started = 0;
+  int yolo_started = 0;
+  int tracking_started = 0;
 
   // Subscribe to the ROS log messages
   ros::NodeHandle nh;
@@ -31,6 +49,7 @@ SavasanGui::SavasanGui(QWidget *parent) :
       ros::spinOnce();
   });
   rosTimer->start(100); // Call ros::spinOnce() every 100 ms
+
 }
 
 SavasanGui::~SavasanGui()
@@ -47,9 +66,9 @@ void SavasanGui::onStartKamikazeButtonClicked()
   int approachDistance = ui->approach_input->text().toInt();
 
   // Set ROS parameters
-  ros::param::set("azimut_degree", azimut);
+  ros::param::set("azimuth_angle", azimut);
   ros::param::set("dive_angle", diveAngle);
-  ros::param::set("offset", offset);
+  ros::param::set("circle_offset", offset);
   ros::param::set("approach_distance", approachDistance);
 
   // Optional: Log the parameters to the console for debugging
@@ -57,11 +76,11 @@ void SavasanGui::onStartKamikazeButtonClicked()
            azimut, diveAngle, offset, approachDistance);
 
   ros::NodeHandle nh;
-  ros::ServiceClient client = nh.serviceClient<std_srvs::Empty>("/start_kamikaze");
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("/start_kamikaze");
 
 
   QtConcurrent::run([client]() mutable {
-    std_srvs::Empty srv;
+    std_srvs::Trigger srv;
     if (client.call(srv)) {
         ROS_INFO("Service /start_kamikaze called successfully.");
     } else {
@@ -102,22 +121,26 @@ void SavasanGui::handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg)
                        .arg(QString::fromStdString(msg->name))
                        .arg(QString::fromStdString(msg->msg));
 
-  if (QString::fromStdString(msg->name) == "/autonom_maneuver_node") {
+  if (QString::fromStdString(msg->name) == "/kamikaze_node") {
         ui->kamikaze_logs->append(logMessage);
         ui->kamikaze_logs->moveCursor(QTextCursor::End);
     }
+  else if (QString::fromStdString(msg->name) == "/yolov8_node") {
+        ui->tracker_logger->append(logMessage);
+        ui->tracker_logger->moveCursor(QTextCursor::End);
+  }
+  else if(QString::fromStdString(msg->name) == "/comm_node"){
+        ui->tracker_logger->append(logMessage);
+        ui->tracker_logger->moveCursor(QTextCursor::End);
+        ui->kamikaze_logs->append(logMessage);
+        ui->kamikaze_logs->moveCursor(QTextCursor::End);
+  }
   else {
     ui->general_log->append(logMessage);
     ui->general_log->moveCursor(QTextCursor::End);
   }
 }
 
-void SavasanGui::onAltitudeSliderChanged(int value)
-{
-  // Handle the altitude slider value change
-  ROS_INFO("Daha implement etmedim kral");
-
-}
 
 void sendcommandint(int command, int param1, int param2, int param3, int param4,int x,int y,int z){
     ros::NodeHandle nh2;
@@ -145,13 +168,118 @@ void sendcommandint(int command, int param1, int param2, int param3, int param4,
         };
 }
 
-void SavasanGui::onSpeedSliderChanged(int value)
-{
-  // Handle the speed slider value change
-  ROS_INFO("Speed slider changed to: %d", value);
 
-  sendcommandint(178,0,value,0,0,0,0,0);
+void SavasanGui::on_startGpsTracking_clicked()
+{
+  ros::param::set("savasan_gui_node/tracing_online", true);
+  ROS_INFO("GPS tracking started.");
 }
 
+void SavasanGui::on_stopGpsTracking_clicked()
+{
+  ros::param::set("savasan_gui_node/tracing_online", false);
+  ROS_INFO("GPS tracking stopped.");
+}
+
+void SavasanGui::on_startYolo_clicked()
+{
+  ros::NodeHandle nh;
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("/start_yolov8_tracking");
+
+  std_srvs::Trigger srv;
+
+  if (client.call(srv)) {
+    if (srv.response.success) {
+      ROS_INFO("YOLO node started successfully: %s", srv.response.message.c_str());
+    } else {
+      ROS_WARN("Failed to start YOLO node: %s", srv.response.message.c_str());
+    }
+  } else {
+    ROS_ERROR("Service call to Start YOLO failed.");
+  }}
+
+void SavasanGui::on_stopYolo_clicked()
+{
+  ros::NodeHandle nh;
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("/stop_yolov8_tracking");
+
+  std_srvs::Trigger srv;
+
+  if (client.call(srv)) {
+    if (srv.response.success) {
+      ROS_INFO("YOLO node stopped successfully: %s", srv.response.message.c_str());
+    } else {
+      ROS_WARN("Failed to stop YOLO node: %s", srv.response.message.c_str());
+    }
+  } else {
+    ROS_ERROR("Service call to Stop YOLO failed.");
+  }}
+
+void SavasanGui::on_startCompetition_clicked()
+{
+  ros::param::set("savasan_gui_node/competition_online", true);
+  ui->online_led->setText("  Online");
+
+  QPalette palette = ui->online_led->palette();
+  palette.setColor(QPalette::WindowText, Qt::green);  // You can change Qt::red to any color you want
+  ui->online_led->setPalette(palette);
+  ROS_INFO("Competition started.");
+}
+
+void SavasanGui::on_stopCompetition_clicked()
+{
+  ros::param::set("savasan_gui_node/competition_online", false);
+  ui->online_led->setText("  Offline");
+
+  QPalette palette = ui->online_led->palette();
+  palette.setColor(QPalette::WindowText, Qt::red);  // You can change Qt::red to any color you want
+  ui->online_led->setPalette(palette);
+  ROS_INFO("competition stopped.");
+}
+
+void SavasanGui::on_UsePID_stateChanged(int arg1)
+{
+  ros::param::set("savasan_gui_node/usePID", arg1);
+  if(arg1){
+      ROS_INFO("PID control is online");
+  }
+  else {
+      ROS_INFO("PID control is offline");
+  }
+
+}
+
+void SavasanGui::on_startRecording_clicked()
+{
+  ros::NodeHandle nh;
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("image_proccessor/start_recording");
+
+  std_srvs::Trigger srv;
+
+  if (client.call(srv)) {
+    if (srv.response.success) {
+      ROS_INFO("Camera recording started successfully: %s", srv.response.message.c_str());
+    } else {
+      ROS_WARN("Failed to start camera recording: %s", srv.response.message.c_str());
+    }
+  } else {
+    ROS_ERROR("Service call to start camera recording failed.");
+  }}
 
 
+void SavasanGui::on_stopRecording_clicked()
+{
+  ros::NodeHandle nh;
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("image_proccessor/stop_recording");
+
+  std_srvs::Trigger srv;
+
+  if (client.call(srv)) {
+    if (srv.response.success) {
+      ROS_INFO("Camera recording Stopped successfully: %s", srv.response.message.c_str());
+    } else {
+      ROS_WARN("Failed to stop camera recording: %s", srv.response.message.c_str());
+    }
+  } else {
+    ROS_ERROR("Service call to stop camera recording failed.");
+  }}
