@@ -163,15 +163,15 @@ class Lock_Checker:
             try:
                 rospy.wait_for_service("/send_lock_message")
                 send_lock_message = rospy.ServiceProxy("/send_lock_message", sendlock)
-                response = send_lock_message(Kilitlenme{start_hour= self.start_time[0]
-                                                        start_min= self.start_time[1]
-                                                        start_second= self.start_time[2]
-                                                        start_milisecond= self.start_time[3]
-                                                        stop_hour= self.end_time[0]
-                                                        stop_min= self.end_time[1]
-                                                        stop_second= self.end_time[2]
-                                                        stop_milisecond= self.end_time[3]
-                                                        otonom= 1})
+                response = send_lock_message(Kilitlenme(start_hour= self.start_time[0],
+                                                        start_min= self.start_time[1],
+                                                        start_second= self.start_time[2],
+                                                        start_milisecond= self.start_time[3],
+                                                        stop_hour= self.end_time[0],
+                                                        stop_min= self.end_time[1],
+                                                        stop_second= self.end_time[2],
+                                                        stop_milisecond= self.end_time[3],
+                                                        otonom= 1))
             except Exception as e:
                 rospy.logerr(
                     f"An error occurred while creating lock-on data: {str(e)}")
