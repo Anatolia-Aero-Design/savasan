@@ -34,7 +34,7 @@ class QR_Node:
         try:
             if self.image_sub is None:
                 self.image_sub = rospy.Subscriber('camera/image_raw', Image, self.image_callback)
-                rospy.loginfo("YOLOv8 tracking started.")
+                rospy.loginfo("Qr Reader started.")
             return TriggerResponse(success=1)
         except:
             return TriggerResponse(success=0)
