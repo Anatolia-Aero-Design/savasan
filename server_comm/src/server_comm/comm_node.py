@@ -26,7 +26,7 @@ class Comm_Node:
         self.base_url = "http://savasaniha.baykartech.com/api"
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
-        self.team_number = 31
+        self.team_number = 69
         self.header = {"Content-Type": "application/json",
                        "Accept": "application/json"}
 
@@ -292,13 +292,19 @@ class Comm_Node:
             rospy.logerr(f"mode secerken hata{self.state}")
             IHA_otonom = 0
         try:
-            # Convert quaternion to euler angles
-            roll, pitch, yaw = quaternion_to_euler(
-                self.imu.orientation.x,
-                self.imu.orientation.y,
-                self.imu.orientation.z,
-                self.imu.orientation.w,
-            )
+            if self.imu is not None and hasattr(self.imu, 'orientation'):
+                roll, pitch, yaw = quaternion_to_euler(
+                    self.imu.orientation.x,
+                    self.imu.orientation.y,
+                    self.imu.orientation.z,
+                    self.imu.orientation.w,
+                )
+            else:
+                rospy.logwarn("IMU data is not available or incomplete.")
+                return  # or set default values for roll, pitch, yaw
+        except Exception as e:
+            rospy.logerr(f"Error processing IMU data: {e}")
+            
 
             # Prepare data dictionary
             data_dict = {
