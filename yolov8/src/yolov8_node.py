@@ -11,6 +11,8 @@ import cv2
 import time
 import math
 import numpy as np
+import rospkg
+import os
 
 
 class YOLOv8TrackingNode:
@@ -24,9 +26,12 @@ class YOLOv8TrackingNode:
             '/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         self.bbox_pub = rospy.Publisher(
             "/yolov8/xywh", Yolo_xywh, queue_size=60)
+        
+        rospack = rospkg.RosPack()
+        package_path = rospack.get_path('yolov8')
+        file_path = os.path.join(package_path, 'model/best_s.pt')
 
-        self.model = YOLO(
-            "/home/valvarn/catkin_ws/src/savasan/yolov8/model/best_s.pt")
+        self.model = YOLO(file_path)
 
         # Services to start and stop tracking
         self.start_service = rospy.Service(
