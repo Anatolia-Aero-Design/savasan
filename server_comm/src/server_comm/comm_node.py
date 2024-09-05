@@ -17,9 +17,6 @@ from server_comm.msg import KonumBilgileri, KonumBilgisi
 
 from utils import quaternion_to_euler, calculate_speed, unix_to_utc_formatted
 
-from datetime import datetime
-import time
-import threading
 from image_processor.msg import Yolo_xywh
 
 
@@ -54,6 +51,7 @@ class Comm_Node:
         self.qr_published = False
         self.fcu_time = None
         self.fcu_time_nsecs = None
+        self.kilit = None
 
         self.bbox = None
         self.bbox_x = None
@@ -63,7 +61,7 @@ class Comm_Node:
 
         self.start_time = None
         self.end_time = None
-        
+
         try:
             # Initialize Subscribers
             self.imu_sub = rospy.Subscriber(
@@ -93,6 +91,8 @@ class Comm_Node:
             self.fcu_time_sub = rospy.Subscriber(
                 "/mavros/time_reference", TimeReference, self.fcu_time_callback
             )
+            self.kilit_sub = rospy.Subscriber(
+                "/kilit", Bool, self.kilit_callback)
 
         except Exception as e:
             print("error")
@@ -158,6 +158,10 @@ class Comm_Node:
         self.bbox_y = msg.y
         self.bbox_w = msg.w
         self.bbox_h = msg.h
+        self.process_data()
+
+    def kilit_callback(self, msg):
+        self.kilit = msg
         self.process_data()
 
     def login(self):

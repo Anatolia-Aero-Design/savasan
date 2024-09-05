@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 
-import datetime
-import logging
+from datetime import datetime
 
 import requests
 import rospy
 from image_processor.msg import Yolo_xywh  # Import the custom message#
 from std_msgs.msg import Bool
 import time
+
+from test import send_lock_on_info
+# from server_comm.srv import sendlock, sendlockRequest
+# from server_comm.msg import Kilitlenme
 
 
 class Timer:
@@ -20,41 +23,40 @@ class Timer:
         if not self.running:
             self.start_time = time.time()
             self.running = True
-            print("Chronometer started.")
         else:
-            print("Chronometer is already running.")
+            pass
 
     def stop(self):
         if self.running:
             self.end_time = time.time()
             self.running = False
             elapsed_time = self.end_time - self.start_time
-            print(f"Chronometer stopped. Elapsed time: {self.format_time(elapsed_time)}")
             return elapsed_time
         else:
-            print("Chronometer is not running.")
             return None
 
     def reset(self):
         self.start_time = None
         self.end_time = None
         self.running = False
-        print("Chronometer reset.")
 
     def elapsed(self):
         if self.running:
             elapsed_time = time.time() - self.start_time
-            print(f"Elapsed time: {self.format_time(elapsed_time)}")
             return elapsed_time
         else:
-            print("Chronometer is not running.")
             return None
 
     @staticmethod
     def format_time(seconds):
         mins, secs = divmod(seconds, 60)
         hours, mins = divmod(mins, 60)
-        return f"{int(hours):02}:{int(mins):02}:{secs:05.2f}"
+        return f"{int(mins):02}:{secs:05.2f}"
+
+    def get_current_time(self):
+        now = datetime.now()
+        return now.hour, now.minute, now.second, now.microsecond
+
 
 class Lock_Checker:
     def __init__(self) -> None:
@@ -86,6 +88,9 @@ class Lock_Checker:
         )
 
         self.timer = Timer()
+        self.elapsed_time = None
+        self.timer_check = False
+        self.kilitlenme_data_sent = False
 
     def bbox_callback(self, msg):
         self.bbox = msg
@@ -102,7 +107,8 @@ class Lock_Checker:
         lock_on_status, kilit = self.lock_on_status(
             proportions, self.lock_on_controller, self.kilit_controller
         )
-        self.send_lock_on_info(kilit, lock_on_status)
+
+        self.kilit_pub.publish(self.send_lock_on_info(kilit, lock_on_status))
 
     # Calculate bounding box proportion to the target area
     def calculate_lock_on_proportion(self, target_coordinates, bbox_coordinates):
@@ -136,10 +142,10 @@ class Lock_Checker:
     def lock_on_status(self, proportions, lock_on_status, kilit):
         if proportions[0] >= 0.93 and proportions[1] >= 0.93:
             start_time = self.timer.start()
-            elapsed_time = self.timer.elapsed()
-            if elapsed_time >= 4.00:
+            self.elapsed_time = self.timer.elapsed()
+            if self.elapsed_time >= 4.00:
                 lock_on_status = True
-            if elapsed_time > 0.00:
+            if self.elapsed_time > 0.00:
                 kilit = True
             else:
                 kilit = False
@@ -152,10 +158,10 @@ class Lock_Checker:
         if kilit_msg != True:
             self.timer_check = False
         if kilit_msg is True and self.timer_check is False:
-            self.start_time = self.get_current_time()
+            self.start_time = self.timer.get_current_time()
             self.timer_check = True  # timer started
         if lock_on_msg == True and self.kilitlenme_data_sent == False:
-            self.end_time = self.get_current_time()
+            self.end_time = self.timer.get_current_time()
             try:
                 data_dict = {
                     "kilitlenmeBaslangicZamani": {
@@ -172,32 +178,30 @@ class Lock_Checker:
                     },
                     "otonom_kilitlenme": 1
                 }
-                response = self.session.post(
-                    self.server_url_kilitlenme_bilgisi, json=data_dict)
-                if response.status_code == 200:
-                    try:
-                        response_json = response.json()
-                        logging.info(
-                            f"Lock-on data sent successfully: {response_json}")
-                        rospy.logwarn(f"{data_dict}")
-                        self.kilitlenme_data_sent = True
-                    except ValueError:
-                        logging.error(
-                            f"Failed to parse JSON response: {response.text}")
-                else:
-                    logging.error(
-                        f"Failed to send lock-on data, status code: {response.status_code}, response: {response.text}")
             except Exception as e:
                 rospy.logerr(
-                    f"An error occurred while sending lock-on data: {str(e)}")
-
-
+                    f"An error occurred while creating lock-on data: {str(e)}")
+        return data_dict
 
 
 if __name__ == "__main__":
     rospy.init_node("lock_checker_node", anonymous=True)
     lock_checker_node = Lock_Checker()
-    lock_checker_node.lock_on_status()
+    format_data = lock_checker_node.send_lock_on_info
+    rospy.wait_for_service("/send_lock_message")
+    '''send_lock_message = rospy.ServiceProxy("/send_lock_message", sendlock)
+    response = send_lock_message(Kilitlenme{
+                                start_hour =       format_data["kilitlenmeBaslangicZamani"]["hour"]
+                                start_min =        format_data["kilitlenmeBaslangicZamani"]["minute"]
+                                start_second =     format_data["kilitlenmeBaslangicZamani"]["second"]
+                                start_milisecond = format_data["kilitlenmeBaslangicZamani"]["milisecond"]
+                                stop_hour =        format_data["kilitlenmeBitisZamani"]["hour"]
+                                stop_min =         format_data["kilitlenmeBitisZamani"]["minute"]
+                                stop_second =      format_data["kilitlenmeBitisZamani"]["second"]
+                                stop_milisecond =  format_data["kilitlenmeBitisZamani"]["milisecond"]
+                                otonom =           format_data["otonom_kilitlenme"]})
+
+    print(response)'''
     try:
         rospy.spin()
     except KeyboardInterrupt:
