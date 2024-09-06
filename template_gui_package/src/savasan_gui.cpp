@@ -171,15 +171,39 @@ void sendcommandint(int command, int param1, int param2, int param3, int param4,
 
 void SavasanGui::on_startGpsTracking_clicked()
 {
-  ros::param::set("savasan_gui_node/tracing_online", true);
-  ROS_INFO("GPS tracking started.");
-}
+  ros::NodeHandle nh;
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("/start_navigation");
+
+  std_srvs::Trigger srv;
+
+  if (client.call(srv)) {
+    if (srv.response.success) {
+      ROS_INFO("Navigation node started successfully: %s", srv.response.message.c_str());
+    } else {
+      ROS_WARN("Failed to start Navigation node: %s", srv.response.message.c_str());
+    }
+  } else {
+    ROS_ERROR("Service call to Start Navigation failed.");
+  }}
+
 
 void SavasanGui::on_stopGpsTracking_clicked()
 {
-  ros::param::set("savasan_gui_node/tracing_online", false);
-  ROS_INFO("GPS tracking stopped.");
-}
+  ros::NodeHandle nh;
+  ros::ServiceClient client = nh.serviceClient<std_srvs::Trigger>("/stop_navigation");
+
+  std_srvs::Trigger srv;
+
+  if (client.call(srv)) {
+    if (srv.response.success) {
+      ROS_INFO("Navigation node stopped successfully: %s", srv.response.message.c_str());
+    } else {
+      ROS_WARN("Failed to stop Navigation node: %s", srv.response.message.c_str());
+    }
+  } else {
+    ROS_ERROR("Service call to stop Navigation failed.");
+  }}
+
 
 void SavasanGui::on_startYolo_clicked()
 {
@@ -283,3 +307,9 @@ void SavasanGui::on_stopRecording_clicked()
   } else {
     ROS_ERROR("Service call to stop camera recording failed.");
   }}
+
+void SavasanGui::on_spinBox_valueChanged(int arg1)
+{
+  ros::param::set("/gps_navigator/target_id", arg1);
+  ROS_INFO("Target Set.");
+}

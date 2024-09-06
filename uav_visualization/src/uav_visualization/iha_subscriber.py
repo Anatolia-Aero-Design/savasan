@@ -19,8 +19,8 @@ e2 = 2*f - f**2
 #TODO: the home point is wrong
 def geodetic_to_enu(lat, lon, alt):
 
-    lat_ref =  36.93824690
-    lon_ref = 35.52944677
+    lat_ref =  rospy.get_param("/comm_node/Home_Lat")
+    lon_ref = rospy.get_param("/comm_node/Home_Lon")
 
     alt_ref = 0
     # Convert degrees to radians
