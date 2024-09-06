@@ -71,11 +71,13 @@ class Lock_Checker:
 
         self.kilit_pub = rospy.Publisher("/kilit", Bool, queue_size=60)
 
+        self.screen_width = 1280
+        self.screen_height = 720
         # Draw target area
-        target_box_x = int(1280 * 0.25)
-        target_box_y = int(720 * 0.1)
-        target_box_w = int(1280 * 0.75)
-        target_box_h = int(720 * 0.9)
+        target_box_x = int(self.screen_width * 0.25)
+        target_box_y = int(self.screen_height * 0.1)
+        target_box_w = int(self.screen_width * 0.75)
+        target_box_h = int(self.screen_height * 0.9)
         self.target_box_coordinates = (
             target_box_x,
             target_box_y,
@@ -107,35 +109,48 @@ class Lock_Checker:
 
     # Calculate bounding box proportion to the target area
     def calculate_lock_on_proportion(self, target_coordinates, bbox_coordinates):
-        x_t, y_t, w_t, h_t = target_coordinates
-        target_area = abs(w_t - x_t) * abs(h_t - y_t)
+        bbox_x, bbox_y, bbox_w, bbox_h = bbox_coordinates
+        target_x, target_y, target_w, target_h = target_coordinates
 
-        x_d, y_d, w_d, h_d = bbox_coordinates
-        bbox_area = abs(w_d - x_d) * abs(h_d - y_d)
+        # Calculate bounding box dimensions
+        bbox_width = abs(bbox_w - bbox_x)
+        bbox_height = abs(bbox_h - bbox_y)
 
-        # Initialize proportions with default values
-        horizontal_proportion = 0
-        vertical_proportion = 0
+        # Calculate proportions
+        horizontal_proportion = bbox_width / self.screen_width
+        vertical_proportion = bbox_height / self.screen_height
 
-        if bbox_area <= target_area:
-            x_o = max(x_t, x_d)
-            y_o = max(y_t, y_d)
-            w_o = min(w_t, w_d)
-            h_o = min(h_t, h_d)
+        # Check minimum proportion (5%)
+        min_proportion = 0.06
+        if horizontal_proportion < min_proportion and vertical_proportion < min_proportion:
+            rospy.logwarn("Bounding box proportions are too small")
+        
+        else:
+            # Calculate the intersection between bbox and target_bbox
+            intersect_x = max(bbox_x, target_x)
+            intersect_y = max(bbox_y, target_y)
+            intersect_w = min(bbox_w, target_w)
+            intersect_h = min(bbox_h, target_h)
 
-            overlap_width = max(0, w_o - x_o)
-            overlap_height = max(0, h_o - y_o)
+            # If there's no intersection, return None
+            if intersect_x >= intersect_w or intersect_y >= intersect_h:
+                rospy.logwarn("Target is out of locking area")
 
-            horizontal_proportion = (
-                overlap_width / (w_d - x_d) if (w_d - x_d) != 0 else 0
-            )
-            vertical_proportion = (
-                overlap_height / (h_d - y_d) if (h_d - y_d) != 0 else 0
-            )
-        return horizontal_proportion, vertical_proportion
+            # Calculate intersection width and height
+            intersect_width = intersect_w - intersect_x
+            intersect_height = intersect_h - intersect_y
+
+            try:  # Calculate the proportion of the bounding box that overlaps with the target_bbox
+                intersect_horizontal_proportion = intersect_width / bbox_width
+                intersect_vertical_proportion = intersect_height / bbox_height
+            except ZeroDivisionError as e:
+                return 0, 0
+            # Return the proportions and bounding box
+            rospy.logwarn(f"{intersect_horizontal_proportion}, {intersect_vertical_proportion}")
+            return intersect_horizontal_proportion, intersect_vertical_proportion
 
     def lock_on_status(self, proportions, lock_on_status, kilit):
-        if proportions[0] >= 0.93 and proportions[1] >= 0.93:
+        if proportions[0] >= 0.06 and proportions[1] >= 0.06:
             start_time = self.timer.start()
             self.elapsed_time = self.timer.elapsed()
             if self.elapsed_time >= 4.00:

@@ -5,7 +5,6 @@ from server_comm.msg import KonumBilgileri
 from mavros_msgs.srv import CommandLong, CommandLongRequest
 from std_srvs.srv import Trigger, TriggerResponse
 from mavros_msgs.srv import CommandInt
-from utils import haversine_formula
 
 
 class GPSNavigator:

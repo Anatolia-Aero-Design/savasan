@@ -29,7 +29,7 @@ class YOLOv8TrackingNode:
         
         rospack = rospkg.RosPack()
         package_path = rospack.get_path('yolov8')
-        file_path = os.path.join(package_path, 'model/best_x.pt')
+        file_path = os.path.join(package_path, 'model/best_s.pt')
 
         self.model = YOLO(file_path)
 
