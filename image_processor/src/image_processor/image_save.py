@@ -33,8 +33,6 @@ class VideoSaveNode:
         # Initialize video writer
         self.video_writer = None
         self.fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-        self.frame_width =  1280  # Update this with the actual width of your image
-        self.frame_height = 720  # Update this with the actual height of your image
         self.fps = 30
 
         # Services to start and stop recording
@@ -74,8 +72,9 @@ class VideoSaveNode:
 
         # Initialize video writer if not already initialized
         if self.video_writer is None:
+            height, width = frame.shape[:2]
             self.video_writer = cv2.VideoWriter(self.video_filename, self.fourcc, self.fps,
-                                                (self.frame_width, self.frame_height))
+                                                (width, height))
 
         # Write the frame to the video file
         self.video_writer.write(frame)
