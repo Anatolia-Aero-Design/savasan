@@ -40,6 +40,8 @@ private slots:
 
   void on_stopRecording_clicked();
 
+  void on_pushButton_2_clicked();
+
 private:
   Ui::SavasanGui *ui;
   ros::Subscriber log_subscriber;
