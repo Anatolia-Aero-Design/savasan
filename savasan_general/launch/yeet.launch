@@ -29,16 +29,16 @@
         <param name="/api/qr_koordinati"      value="http://127.0.0.1:5000/api/qr_koordinati"/>
         <param name="/api/kamikaze_bilgisi"   value="http://127.0.0.1:5000/api/kamikaze_bilgisi"/>
         <param name="/api/hss_koordinatlari"  value="http://127.0.0.1:5000/api/hss_koordinatlari"/>
-        <param name="Home_Lat" value="39.81910211"/>
-        <param name="Home_Lon" value="30.53401693"/>
-        <param name="Home_Alt" value="788.7"/>
-        <param name="Target_Lat" value="39.82041602"/>
-        <param name="Target_Lon" value="30.53387217"/>
-        <param name="Target_Alt" value="10"/>
+        <param name="Home_Lat"                value="39.81910211"/>
+        <param name="Home_Lon"                value="30.53401693"/>
+        <param name="Home_Alt"                value="788.7"/>
+        <param name="Target_Lat"              value="39.82041602"/>
+        <param name="Target_Lon"              value="30.53387217"/>
+        <param name="Target_Alt"              value="10"/>
     </node>
 
     <node name="savasan_gui_node" pkg="template_gui_package" type="savasan_gui_node" output="screen">
-        <param name="use_gui"           value="$(arg gui)" />
+        <param name="use_gui"             value="$(arg gui)" />
         <param name="competition_online"  value="false" />
         <param name="yolo_online"         value="false" />
         <param name="tracing_online"      value="false" />
@@ -47,12 +47,13 @@
 
     </node>
 
-    <node name="kamikaze_node"         pkg="kamikaze"          type="kamikaze.py"              output="screen" />
-    <node name="gps_navigator"         pkg="gps_navigator"     type="gps_navigator_node.py"    output="screen"/>
-    <node name="air_defense_node"      pkg="hss"               type="air_defense_node.py"      output="screen"/>
-    <node name="uav_visualization"     pkg="uav_visualization" type="iha_subscriber.py"        output="screen"/>
-    <node name="plane_model"           pkg="uav_visualization" type="plane_model.py"           output="screen"/>
-    <node name="home_gps_publisher"    pkg="savasan_general"   type="home_gps_publisher,py"    output="screen"/> 
+    <node name="kamikaze_node"          pkg="kamikaze"          type="kamikaze.py"              output="screen"/>
+    <node name="gps_navigator"          pkg="gps_navigator"     type="gps_navigator_node.py"    output="screen"/>
+    <node name="impact_prevention_node" pkg="gps_navigator"     type="impact_prevention.py"     output="screen"/>
+    <node name="air_defense_node"       pkg="hss"               type="air_defense_node.py"      output="screen"/>
+    <node name="uav_visualization"      pkg="uav_visualization" type="iha_subscriber.py"        output="screen"/>
+    <node name="plane_model"            pkg="uav_visualization" type="plane_model.py"           output="screen"/>
+    <node name="home_gps_publisher"     pkg="savasan_general"   type="home_gps_publisher,py"    output="screen"/> 
 
     <!-- Start RViz with the specified configuration file -->
     <node pkg="tf"            type="static_transform_publisher" name="odom_to_map_broadcaster" args="0 0 0 0 0 0 map odom 100" />
