@@ -17,10 +17,14 @@ class VideoSaveNode:
 
         # Subscribers using message_filters for synchronization
         self.tracking_sub = rospy.Subscriber("/camera/image_processed", Image, self.callback)
-           
+        
         competition_no = 1 # Will be set accordingly during each round of competition
         current_time = time.localtime()
-        file_name = f"{competition_no}_Anatolia_Aero_Design_{current_time.tm_mday}_0{current_time.tm_mon}_{current_time.tm_year}.avi"
+        #Unique time for file saving
+        unique_timestamp = time.strftime("%H%M%S", current_time)
+        
+        # when sending the video to the referees timestamp MUST be removed
+        file_name = f"{competition_no}_Anatolia_Aero_Design_{current_time.tm_mday}_0{current_time.tm_mon}_{current_time.tm_year}_{unique_timestamp}.avi"
         
         
         rospack = rospkg.RosPack()
