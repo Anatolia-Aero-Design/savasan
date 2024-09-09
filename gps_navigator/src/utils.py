@@ -1,3 +1,5 @@
+import math
+
 EARTH_RADIUS = 6371000
 
 def haversine_formula(latitude_1, longitude_1, latitude_2, longitude_2):

@@ -222,7 +222,6 @@ class UAVWaypointManager:
                 try: 
                     response = qr_stop()
                     stop_time = rospy.Time.now()
-                    self.kamikaze_started = True
                     qr_text = response.message
                 except:
                     rospy.loginfo(f"Failed when qr stop service call") 
