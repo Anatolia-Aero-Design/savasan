@@ -63,9 +63,6 @@ class Lock_Checker:
         self.kilit_controller = None
         self.bbox = self.bbox_x = self.bbox_y = self.bbox_w = self.bbox_h = None
 
-        self.server_url_kilitlenme_bilgisi = rospy.get_param(
-            "/comm_node/api/kilitlenme_bilgisi"
-        )
         self.xywh_sub = rospy.Subscriber(
             "/yolov8/xywh", Yolo_xywh, self.bbox_callback)
 
@@ -124,6 +121,7 @@ class Lock_Checker:
         min_proportion = 0.06
         if horizontal_proportion < min_proportion and vertical_proportion < min_proportion:
             rospy.logwarn("Bounding box proportions are too small")
+            return 0, 0
         
         else:
             # Calculate the intersection between bbox and target_bbox
@@ -155,6 +153,7 @@ class Lock_Checker:
             self.elapsed_time = self.timer.elapsed()
             if self.elapsed_time >= 4.00:
                 lock_on_status = True
+                self.timer.reset()
             if self.elapsed_time > 0.00:
                 kilit = True
             else:
@@ -174,8 +173,8 @@ class Lock_Checker:
         if lock_on_msg == True and tracking_online == 1:
             self.end_time = self.timer.get_current_time()
             try:
-                rospy.wait_for_service("/send_lock_message")
-                send_lock_message = rospy.ServiceProxy("/send_lock_message", sendlock)
+                rospy.wait_for_service("send_lock_message")
+                send_lock_message = rospy.ServiceProxy("send_lock_message", sendlock)
                 data = Kilitlenme(start_hour= self.start_time[0],
                                                         start_min= self.start_time[1],
                                                         start_second= self.start_time[2],
