@@ -8,6 +8,9 @@
 #include <QtConcurrent/QtConcurrent>
 #include <rosgraph_msgs/Log.h>
 #include <mavros_msgs/CommandInt.h>
+#include <QDialog>
+
+
 
 SavasanGui::SavasanGui(QWidget *parent) :
   QWidget(parent),
@@ -241,6 +244,8 @@ void SavasanGui::on_stopYolo_clicked()
 
 void SavasanGui::on_startCompetition_clicked()
 {
+
+
   ros::param::set("savasan_gui_node/competition_online", true);
   ui->online_led->setText("  Online");
 

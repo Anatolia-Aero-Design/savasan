@@ -353,6 +353,7 @@ class Comm_Node:
                 "iha_batarya": int(self.battery.percentage * 100),
                 "iha_otonom": IHA_otonom,
                 "iha_kilitlenme": int(self.kilit),
+                "iha_kilitlenme": int(self.kilit),
                 "hedef_merkez_X": self.bbox_x,
                 "hedef_merkez_Y": self.bbox_y,
                 "hedef_genislik": self.bbox_w,

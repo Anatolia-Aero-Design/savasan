@@ -70,6 +70,7 @@ class Lock_Checker:
 
         self.screen_width = 1280
         self.screen_height = 720
+
         # Draw target area
         target_box_x = int(self.screen_width * 0.25)
         target_box_y = int(self.screen_height * 0.1)
@@ -112,6 +113,9 @@ class Lock_Checker:
         # Calculate bounding box dimensions
         bbox_width = abs(bbox_w - bbox_x)
         bbox_height = abs(bbox_h - bbox_y)
+        # Calculate bounding box dimensions
+        bbox_width = abs(bbox_w - bbox_x)
+        bbox_height = abs(bbox_h - bbox_y)
 
         # Calculate proportions
         horizontal_proportion = bbox_width / self.screen_width
@@ -151,6 +155,7 @@ class Lock_Checker:
         if proportions[0] >= 0.06 and proportions[1] >= 0.06:
             start_time = self.timer.start()
             self.elapsed_time = self.timer.elapsed()
+            rospy.loginfo(self.elapsed_time)
             if self.elapsed_time >= 4.00:
                 lock_on_status = True
                 self.timer.reset()
