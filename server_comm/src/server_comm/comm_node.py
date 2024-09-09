@@ -99,8 +99,6 @@ class Comm_Node:
         self.konum_pub = rospy.Publisher(
             "/konum_bilgileri", KonumBilgileri, queue_size=10
         )
-        self.hss_coordinate_pub = rospy.Publisher(
-            "/hss_coordinates", HavaSavunmaKoordinatlari)
 
         # Create a thread for sending telemetry data
         self.telemetry_thread = threading.Thread(target=self.send_telem_loop)

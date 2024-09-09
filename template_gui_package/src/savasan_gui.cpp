@@ -9,6 +9,14 @@
 #include <rosgraph_msgs/Log.h>
 #include <mavros_msgs/CommandInt.h>
 #include <QDialog>
+#include <ros/package.h>
+#include <QDir>
+#include <QStringList>
+#include <mavros_msgs/Waypoint.h>
+#include <mavros_msgs/WaypointPush.h>
+#include <jsoncpp/json/json.h>
+#include <fstream>
+#include <vector>
 
 
 
@@ -36,6 +44,8 @@ SavasanGui::SavasanGui(QWidget *parent) :
   connect(ui->startRecording, &QPushButton::clicked, this, &SavasanGui::on_startRecording_clicked);
   connect(ui->stopRecording, &QPushButton::clicked, this, &SavasanGui::on_stopRecording_clicked);
   connect(ui->UsePID, &QPushButton::clicked, this, &SavasanGui::on_UsePID_stateChanged);
+
+  populateMissionComboBox();
 
   int recording_started = 0;
   int yolo_started = 0;
@@ -317,4 +327,97 @@ void SavasanGui::on_spinBox_valueChanged(int arg1)
 {
   ros::param::set("/gps_navigator/target_id", arg1);
   ROS_INFO("Target Set.");
+}
+
+// Function to populate the combo box with mission files from a specific folder
+void SavasanGui::populateMissionComboBox() {
+    // Get the absolute path to the ROS package (replace "your_package_name" with the actual package name)
+    std::string package_path = ros::package::getPath("savasan_general");
+
+    // Set the relative path to the mission folder within that package
+    QString missionFolderPath = QString::fromStdString(package_path) + "/missions/";
+
+    // Clear any existing items
+    ui->load_mission_combo->clear();
+
+    // Get a list of .json files in the specified folder
+    QDir dir(missionFolderPath);
+    QStringList filters;
+    filters << "*.json";  // Adjust filter as necessary
+    dir.setNameFilters(filters);
+
+    QFileInfoList fileList = dir.entryInfoList();
+    foreach (const QFileInfo &fileInfo, fileList) {
+        ui->load_mission_combo->addItem(fileInfo.fileName(), fileInfo.absoluteFilePath());
+    }
+}
+
+void SavasanGui::on_load_mission_clicked()
+{
+    // Get the file path from the combo box
+    QString json_file_path = ui->load_mission_combo->currentText();
+
+    std::string package_path = ros::package::getPath("savasan_general");
+
+    // Set the relative path to the mission folder within that package
+    QString missionFolderPath = QString::fromStdString(package_path) + "/missions/" + json_file_path;
+    qWarning() << missionFolderPath;
+
+
+
+    // Open the JSON file
+    QFile file(missionFolderPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Could not open JSON file.";
+        return;
+    }
+
+    // Read the file content
+    QByteArray file_content = file.readAll();
+    file.close();
+
+    // Parse the JSON content
+    QJsonDocument json_doc = QJsonDocument::fromJson(file_content);
+    if (!json_doc.isArray()) {
+        qWarning() << "Invalid JSON format.";
+        return;
+    }
+
+    QJsonArray json_array = json_doc.array();
+
+    // Prepare a ROS service client to push the waypoints
+    ros::NodeHandle nh;
+    ros::ServiceClient waypoint_push_client = nh.serviceClient<mavros_msgs::WaypointPush>("mavros/mission/push");
+    mavros_msgs::WaypointPush waypoint_push_srv;
+
+    // Convert JSON waypoints to mavros_msgs::Waypoint and add to the service request
+    for (int i = 0; i < json_array.size(); ++i) {
+        QJsonObject waypoint_obj = json_array[i].toObject();
+
+        mavros_msgs::Waypoint wp;
+        wp.frame = waypoint_obj["frame"].toInt();
+        wp.command = waypoint_obj["command"].toInt();
+        wp.is_current = waypoint_obj["is_current"].toBool();
+        wp.autocontinue = waypoint_obj["autocontinue"].toBool();
+        wp.param1 = waypoint_obj["param1"].toDouble();
+        wp.param2 = waypoint_obj["param2"].toDouble();
+        wp.param3 = waypoint_obj["param3"].toDouble();
+        wp.param4 = waypoint_obj["param4"].toDouble();
+        wp.x_lat = waypoint_obj["x_lat"].toDouble();
+        wp.y_long = waypoint_obj["y_long"].toDouble();
+        wp.z_alt = waypoint_obj["z_alt"].toDouble();
+
+        waypoint_push_srv.request.waypoints.push_back(wp);
+    }
+
+    // Call the service to upload the mission
+    if (waypoint_push_client.call(waypoint_push_srv)) {
+        if (waypoint_push_srv.response.success) {
+            qDebug() << "Mission uploaded successfully!";
+        } else {
+            qWarning() << "Failed to upload the mission.";
+        }
+    } else {
+        qWarning() << "Service call failed.";
+    }
 }

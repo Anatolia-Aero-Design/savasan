@@ -18,6 +18,10 @@ public:
   explicit SavasanGui(QWidget *parent = nullptr);
   ~SavasanGui();
 
+  void populateMissionComboBox();
+
+  bool uploadMission(const std::string& json_file_path);
+
 private slots:
   void onStartKamikazeButtonClicked();
   void handleRosLog(const rosgraph_msgs::Log::ConstPtr &msg);
@@ -41,6 +45,8 @@ private slots:
   void on_stopRecording_clicked();
 
   void on_spinBox_valueChanged(int arg1);
+
+  void on_load_mission_clicked();
 
 private:
   Ui::SavasanGui *ui;
