@@ -47,7 +47,11 @@
 
     </node>
 
-    <node name="camera_publisher"       pkg="image_handler"     type="camera_publisher.py"      output="screen"/>
+    <node name="camera_publisher"       pkg="image_handler"     type="camera_publisher.py"      output="screen">
+        <param name="screen_width"            value="1920"/>
+        <param name="screen_height"           value="1080"/>
+    </node>
+
     <node name="kamikaze_node"          pkg="kamikaze"          type="kamikaze.py"              output="screen"/>
     <node name="pose_publisher_node"    pkg="kamikaze"          type="pose_publisher.py"        output="screen"/>
     <node name="QR_node"                pkg="kamikaze"          type="QR_node.py"               output="screen"/>

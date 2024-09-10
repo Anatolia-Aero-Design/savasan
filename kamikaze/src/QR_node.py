@@ -46,10 +46,11 @@ class QR_Node:
         return self.read
     
     def process_image(self, image):
+        image = utils.convert_to_grayscale(image)
+        image = utils.edge_detection(image)
         image = utils.adjust_brightness_contrast(image, brightness=30, contrast=20)
         image = utils.gamma_correction(image, gamma=1.2)
         image = utils.noise_reduction(image)
-        image = utils.adaptive_threshold(image)
         return image
     
     def qr_reader(self, frame):

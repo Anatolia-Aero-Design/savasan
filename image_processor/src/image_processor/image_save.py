@@ -17,6 +17,7 @@ class VideoSaveNode:
 
         # Subscribers using message_filters for synchronization
         self.tracking_sub = rospy.Subscriber("/camera/image_processed", Image, self.callback)
+
         
         competition_no = 1 # Will be set accordingly during each round of competition
         current_time = time.localtime()
@@ -60,6 +61,8 @@ class VideoSaveNode:
             return TriggerResponse(success=0)
 
     def callback(self, image_msg):
+        self.width  = rospy.get_param("/camera_publisher/screen_width")
+        self.height = rospy.get_param("/camera_publisher/screen_height")
         if not self.recording:
             return
 
@@ -72,9 +75,8 @@ class VideoSaveNode:
 
         # Initialize video writer if not already initialized
         if self.video_writer is None:
-            height, width = frame.shape[:2]
             self.video_writer = cv2.VideoWriter(self.video_filename, self.fourcc, self.fps,
-                                                (width, height))
+                                                (self.width, self.height))
 
         # Write the frame to the video file
         self.video_writer.write(frame)

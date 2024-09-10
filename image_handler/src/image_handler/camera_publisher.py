@@ -36,6 +36,10 @@ def camera_publisher():
 
         while not rospy.is_shutdown():
             ret, frame = cap.read()
+            height, width = frame.shape[:2]
+            rospy.set_param("/camera_publisher/screen_width", width)
+            rospy.set_param("/camera_publisher/screen_height", height)
+            
             if not ret:
                 rospy.logerr("Cannot read frame")
                 break

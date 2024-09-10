@@ -6,7 +6,7 @@ from sensor_msgs.msg import Imu, BatteryState, NavSatFix, TimeReference
 from nav_msgs.msg import Odometry
 from server_comm.srv._gethss import gethssResponse
 from std_msgs.msg import Float64, Bool, String
-from std_srvs.srv import Trigger
+from std_srvs.srv import Trigger, TriggerResponse
 from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse, gethss
 
 
@@ -91,6 +91,9 @@ class Comm_Node:
             )
             self.kilit_sub = rospy.Subscriber("/kilit", Bool, self.kilit_callback)
 
+            self.send_qr_message = rospy.Service(
+            "get_qr", Trigger, self.get_qr)
+            
         except Exception as e:
             rospy.logerr(f"An error occurred in process_data: {e}")
 
@@ -113,7 +116,16 @@ class Comm_Node:
         while not rospy.is_shutdown():
             self.sent_telem()
             rate.sleep()
-
+    
+    def get_qr(self, req):
+        try:
+            url = f'http://127.0.0.1:5000/api/qr_koordinati' # TODO change it to real
+            response = self.session.get(url)
+            return TriggerResponse(success=1)
+        except:
+            rospy.logerr(
+                    f"Failed to retrieve Qr coordinates, status code: {response.status_code}")
+    
     def get_hss_coordinates(self):
         try:
             url = f'{self.base_url}/hss_koordinatlari'

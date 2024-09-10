@@ -33,6 +33,8 @@ class ImageProcessorNode:
 
     def image_callback(self, msg):
         self.image_msg = msg
+        self.width  = rospy.get_param("/camera_publisher/screen_width")
+        self.height = rospy.get_param("/camera_publisher/screen_height")
         self.callback()
 
     def bbox_callback(self, msg):
@@ -50,12 +52,12 @@ class ImageProcessorNode:
         except CvBridgeError as e:
             rospy.logerr(f"CvBridge Error: {e}")
             return
-        height, width = frame.shape[:2]
+
         # Draw target area
-        target_box_x = int(width * 0.25)
-        target_box_y = int(height * 0.1)
-        target_box_w = int(width * 0.75)
-        target_box_h = int(height * 0.9)
+        target_box_x = int(self.width * 0.25)
+        target_box_y = int(self.height * 0.1)
+        target_box_w = int(self.width * 0.75)
+        target_box_h = int(self.height * 0.9)
         cv2.rectangle(
             frame,
             (target_box_x, target_box_y),
