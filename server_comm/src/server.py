@@ -75,4 +75,4 @@ def kenetlenme_bilgisi_gonder():
                
 if __name__ == '__main__':
     competition = Competition()
-    app.run(debug=True, host='192.168.1.57', port=5000)
+    app.run(debug=True, host='127.0.0.1', port=5000)
