@@ -119,7 +119,7 @@ class Comm_Node:
     
     def get_qr(self, req):
         try:
-            url = f'http://127.0.0.1:5000/api/qr_koordinati' # TODO change it to real
+            url = f'{self.base_url}/qr_koordinati'
             response = self.session.get(url)
             return TriggerResponse(success=1)
         except:
