@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
+from savasan.uav_visualization.src.uav_visualization.iha_subscriber import geodetic_to_enu
 from sensor_msgs.msg import NavSatFix
 from server_comm.msg import HavaSavunmaKoordinatlari
 from mavros_msgs.srv import CommandInt, SetMode
@@ -8,6 +9,7 @@ from mavros_msgs.msg import CommandCode, State
 from std_srvs.srv import Trigger, TriggerResponse
 from std_msgs.msg import Float64
 from mavros_msgs.srv import WaypointPush
+from visualization_msgs.msg import Marker, MarkerArray
 import math
 import rospkg
 import os
@@ -27,6 +29,10 @@ class Air_Defense_Node:
         rospack = rospkg.RosPack()
         package_path = rospack.get_path("hss")
         self.mission_file_path = os.path.join(package_path, "mission_folder/fence-items.txt")
+        self.hss_sub = rospy.Subscriber(
+                "hss_locations", HavaSavunmaKoordinatlari, self.hss_draw_marker
+            )
+        self.marker_pub = rospy.Publisher("hss_marker", MarkerArray)
 
         # Set up service proxies
         self.waypoint_push_srv = rospy.ServiceProxy(
@@ -96,7 +102,46 @@ class Air_Defense_Node:
             self.send_command(CommandCode.DO_FENCE_ENABLE, 0)
         except Exception as e:
             rospy.logerr(f"Unexpected error occurred: {e}")
+            
+    def hss_draw_marker(self, data_msg):
+        marker = Marker()
+        marker.header.frame_id = "map"
+        marker.header.stamp = rospy.Time.now()
+        marker.ns = "hss"
+        marker.type = Marker.CYLINDER
+        marker.action = Marker.ADD
+        marker_array = MarkerArray()
+        for data in data_msg:
+            hssEnlem = data["hssEnlem"]
+            hssBoylam = data["hssBoylam"]
+            hssYaricap = data["hssYaricap"]
+            x, y, z = geodetic_to_enu(hssEnlem, hssBoylam, 0)
+            marker.pose.position.x = x
+            marker.pose.position.y = y
+            marker.pose.position.z = 0
+                # Orientation of the cylinder (identity quaternion for no rotation)
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = 1.0
 
+            # Size of the cylinder (x and y are diameter, z is height)
+            marker.scale.x = hssYaricap  # Diameter of the cylinder
+            marker.scale.y = hssYaricap  # Diameter of the cylinder
+            marker.scale.z = 10000    # Height of the cylinder
+            
+            marker.scale.x = 25.0
+            marker.scale.y = 25.0
+            marker.scale.z = 25.0
+
+            marker.color.a = 1.0
+            marker.color.r = 0.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+            marker_array.markers.append(data)
+        self.marker_pub(marker_array)    
+        
+        
     def send_command(self, command, param1, param2=0, param3=0, param4=0, x=0, y=0, z=0):
         try:
             rospy.wait_for_service('/mavros/cmd/command_int')

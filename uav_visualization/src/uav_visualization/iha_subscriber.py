@@ -65,7 +65,7 @@ def callback(data: KonumBilgileri):
     # Parsing the incoming message
     marker_array = MarkerArray()
     for iha in data.konumBilgileri:
-        if iha.takim_numarasi == 31:
+        if iha.takim_numarasi == 32:
             continue
         marker = create_marker(iha)
         marker_array.markers.append(marker)
@@ -84,7 +84,8 @@ def create_marker(iha: KonumBilgisi):
     marker.header.frame_id = "map"
     marker.header.stamp = rospy.Time.now()
     marker.ns = "iha_visualization"
-    marker.type = Marker.SPHERE
+    marker.type = Marker.MESH_RESOURCE
+    marker.mesh_resource = "package://uav_visualization/models/fixed_wing_plane.dae"
     marker.action = Marker.ADD
 
     x, y, z = geodetic_to_enu(iha.IHA_enlem, iha.IHA_boylam, iha.IHA_irtifa)
