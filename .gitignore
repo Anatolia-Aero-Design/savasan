@@ -18,3 +18,4 @@ yolov8/src/yolov8/__pycache__/PID.cpython-38.pyc
 server_comm/src/server_comm/__pycache__/utils.cpython-38.pyc
 kamikaze/src/__pycache__/QR_node.cpython-38.pyc
 kamikaze/src/__pycache__/utilities.cpython-38.pyc
+yolov8/model/yolov10_L.pt
