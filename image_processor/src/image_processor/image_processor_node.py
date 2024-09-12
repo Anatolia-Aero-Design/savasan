@@ -18,6 +18,8 @@ class ImageProcessorNode:
         self.server_time = None
         self.image = None
         self.bbox = self.bbox_x = self.bbox_y = self.bbox_w = self.bbox_h = None
+        self.elapsed_time = "00:00.00"
+
         # Subscribers using message_filters for synchronization
         self.image_sub = rospy.Subscriber(
             "/camera/image_raw", Image, self.image_callback
@@ -66,6 +68,8 @@ class ImageProcessorNode:
             2,
         )
         self.overlay_server_time(frame)
+        self.elapsed_time = rospy.get_param("elapsed_time", "00:00.00")
+        self.overlay_timer_info(frame)
 
         if self.bbox is not None:
             # Draw bounding box
@@ -106,6 +110,39 @@ class ImageProcessorNode:
             (0, 0, 0),
             2,
         )
+        
+    def overlay_timer_info(self, frame):
+        # Define the font and size
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.5  # Increase this value for a larger font
+        font_thickness = 4
+        font_color = (0, 0, 0)  # Text color (green)
+        
+        # Get the size of the text
+        text_size, _ = cv2.getTextSize(self.elapsed_time, font, font_scale, font_thickness)
+        
+        # Define the target box coordinates
+        target_box_x = int(1280 * 0.25)
+        target_box_y = int(720 * 0.1)
+        target_box_w = int(1280 * 0.75)
+        target_box_h = int(720 * 0.9)
+        
+        # Position the text right outside the right side of the target box
+        text_x = target_box_w + 10  # 10 pixels to the right of the box
+        text_y = target_box_y + (target_box_h - target_box_y + text_size[1]) // 2
+        
+        # Overlay the text
+        cv2.putText(
+            frame,
+            self.elapsed_time,
+            (text_x, text_y),
+            font,
+            font_scale,
+            font_color,
+            font_thickness,
+        )
+
+
 
 
 if __name__ == "__main__":

@@ -1663,6 +1663,116 @@ QPushButton:pressed {
       <string>QR_request</string>
      </property>
     </widget>
+    <widget class="QSpinBox" name="spinBox_2">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>160</y>
+       <width>49</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">/* General QLineEdit and QSpinBox Styles */
+QLineEdit, QSpinBox {
+    background-color: #2B2B2B;    /* Dark grey background */
+    color: #EAEAEA;               /* Light grey text */
+    border: 1px solid #3D3D3D;    /* Subtle border for distinction */
+    padding: 5px;                 /* Padding for a clean, modern look */
+    border-radius: 4px;           /* Rounded corners for a modern feel */
+    font-size: 14px;              /* Font size for the text */
+}
+
+/* Focused QLineEdit and QSpinBox */
+QLineEdit:focus, QSpinBox:focus {
+    border: 1px solid #404EED;    /* Deep purple-blue border when focused */
+    background-color: #333333;    /* Slightly lighter background when focused */
+}
+
+/* Disabled QLineEdit and QSpinBox */
+QLineEdit:disabled, QSpinBox:disabled {
+    background-color: #1E1E1E;    /* Darker background for disabled state */
+    color: #666666;               /* Muted text color for disabled fields */
+    border: 1px solid #2C2C2C;    /* Subtle border for disabled state */
+}
+
+/* QSpinBox Arrow Buttons */
+QSpinBox::up-button, QSpinBox::down-button {
+    background-color: #3D3D3D;    /* Dark grey buttons */
+    border: none;                 /* Remove border for a clean look */
+    width: 16px;                  /* Set width of the buttons */
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #505050;    /* Slightly lighter when hovered */
+}
+
+QSpinBox::up-arrow, QSpinBox::down-arrow {
+    image: url(/path/to/up-arrow.png);  /* Add custom arrow icons if needed */
+}</string>
+     </property>
+     <property name="value">
+      <number>1</number>
+     </property>
+    </widget>
+    <widget class="QWidget" name="horizontalLayoutWidget_4">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>130</y>
+       <width>221</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_7">
+      <item>
+       <widget class="QLabel" name="status_text_2">
+        <property name="autoFillBackground">
+         <bool>false</bool>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">/* General QLabel Styles */
+QLabel {
+    color: #EAEAEA;              /* Light grey text for readability */
+    background-color: transparent; /* Keep QLabel background transparent */
+    font-size: 14px;             /* Adjust font size as needed */
+    padding: 2px;                /* Minimal padding for spacing */
+}
+
+/* QLabel with Bold Text (e.g., for headings or important labels) */
+QLabel#boldLabel {
+    color: #EAEAEA;              /* Light grey text */
+    font-weight: bold;           /* Bold text for emphasis */
+    font-size: 16px;             /* Slightly larger font size */
+}
+
+/* QLabel for Subtle Text (e.g., for less important information) */
+QLabel#subtleLabel {
+    color: #A6A6A6;              /* Muted grey text for subtle labels */
+    font-size: 13px;             /* Slightly smaller font size */
+}
+
+/* QLabel with Error/Warning Text */
+QLabel#errorLabel {
+    color: #FF453A;              /* Muted red for error or warning messages */
+    font-weight: bold;           /* Bold for visibility */
+    font-size: 14px;             /* Standard size */
+}
+
+/* QLabel with Accent Color (optional for specific labels) */
+QLabel#accentLabel {
+    color: #5865F2;              /* Muted indigo accent text */
+    font-weight: bold;           /* Bold for emphasis */
+}
+</string>
+        </property>
+        <property name="text">
+         <string>Competition No:</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </widget>
   </widget>
   <widget class="Line" name="line_3">

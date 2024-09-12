@@ -68,6 +68,7 @@ def get_qr_coordinates():
 def kenetlenme_bilgisi_gonder():
     json_data = request.get_json()
     print(f"Received lock-on data: {json_data}")
+    print(json_data)
     competition.update_lock_on(json_data)
     response = competition.response_json()
 
