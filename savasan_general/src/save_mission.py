@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
+import rospkg
 import rospy
 from mavros_msgs.msg import WaypointList
 import json
 from mavros_msgs.srv import WaypointPull
-
+import os
 
 def waypoint_callback(msg):
     waypoints = msg.waypoints
@@ -33,12 +34,14 @@ def waypoint_callback(msg):
 
 
 def save_mission_to_file(mission_data):
-    filename = 'missions.json'
+    rospack = rospkg.RosPack()
+    package_path = rospack.get_path('savasan_general')
+    file_path = os.path.join(package_path, '/missions/missions.json')
 
-    with open(filename, 'w') as f:
+    with open(file_path, 'w') as f:
         json.dump(mission_data, f, indent=4)
 
-    rospy.loginfo("Mission saved to file: {}".format(filename))
+    rospy.loginfo("Mission saved to file: {}".format(file_path))
 
 
 def mission_downloader():

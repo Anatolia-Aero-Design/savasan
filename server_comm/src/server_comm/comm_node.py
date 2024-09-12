@@ -22,10 +22,10 @@ import threading
 class Comm_Node:
     def __init__(self):
         self.session = requests.Session()
-        self.base_url = "http://127.0.0.1:5000/api"
+        self.base_url = "http://savasaniha.baykartech.com/api"
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
-        self.team_number = 69
+        self.team_number = 32
         self.header = {"Content-Type": "application/json",
                        "Accept": "application/json"}
 
@@ -379,7 +379,7 @@ class Comm_Node:
 if __name__ == "__main__":
     rospy.init_node("comm_node", anonymous=True)
     comm_node = Comm_Node()
-    # comm_node.login()  # perform login
+    comm_node.login()  # perform login
     comm_node.start_telem_loop()
     try:
         rospy.spin()
