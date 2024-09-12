@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from urllib import response
 import rospy
 from sensor_msgs.msg import NavSatFix
 from server_comm.msg import HavaSavunmaKoordinatlari
@@ -11,6 +12,8 @@ from mavros_msgs.srv import WaypointPush
 import math
 import rospkg
 import os
+from visualization_msgs.msg import Marker, MarkerArray
+import pymap3d as pm
 
 # Plane does not support NAV_FENCE_CIRCLE_EXCLUSION
 
@@ -23,51 +26,80 @@ class Air_Defense_Node:
         self.altitude = None
         self.state = None
         self.heading = None
-        self.geofence_list = []
+        self.hss_coordinates = None
+        
         rospack = rospkg.RosPack()
         package_path = rospack.get_path("hss")
         self.mission_file_path = os.path.join(package_path, "mission_folder/fence-items.txt")
-
-        # Set up subscribers
-        self.uav_pose_sub = rospy.Subscriber(
-            '/mavros/global_position/global', NavSatFix, self.uav_pose_callback)
-        self.rel_altitude_sub = rospy.Subscriber(
-            '/mavros/global_position/rel_alt', Float64, self.rel_altitude_callback)
-        self.state_sub = rospy.Subscriber(
-            '/mavros/state', State, self.state_callback)
-        self.heading_sub = rospy.Subscriber(
-            '/mavros/global_position/compass_hdg', Float64, self.heading_callback)
-        self.hss_coordinate_sub = rospy.Subscriber(
-            "/hss_coordinates", HavaSavunmaKoordinatlari, self.coordinate_callback)
+        
+        self.hss_sub = rospy.Subscriber(
+                "hss_locations", HavaSavunmaKoordinatlari, self.hss_callback
+            )
+        
+        self.marker_pub = rospy.Publisher("hss_marker", MarkerArray, queue_size=10)
 
         # Set up service proxies
         self.waypoint_push_srv = rospy.ServiceProxy(
             '/mavros/mission/push', WaypointPush)
-        self.command_int_srv = rospy.ServiceProxy(
-            '/mavros/cmd/command_int', CommandInt)
-        self.set_mode_srv = rospy.ServiceProxy('/mavros/set_mode', SetMode)
-        self.start_service = rospy.Service(
-            'enable_geofences', Trigger, self.enable_geo_fences)
-        self.stop_service = rospy.Service(
-            'disable_geofences', Trigger, self.disable_geo_fences)
+        
+        self.push_hss_coordinates = rospy.Service(
+            "push_hss_coordinates", Trigger, self.push_hss_coordinates)
+        
+        
+    def hss_callback(self,data):
+        self.hss_coordinates = data
+        
+    def push_hss_coordinates(self, req):
+        rospy.wait_for_service("/mavros/geofence/push")
+        
+        marker = Marker()
+        marker.header.frame_id = "map"
+        marker.header.stamp = rospy.Time.now()
+        marker.ns = "hss"
+        marker.type = Marker.CYLINDER
+        marker.action = Marker.ADD
+        marker_array = MarkerArray()
+        for data in self.hss_coordinates:
+            hssEnlem = data["hssEnlem"]
+            hssBoylam = data["hssBoylam"]
+            hssYaricap = data["hssYaricap"]
+            
+            x, y, z = pm.geodetic2enu(hssEnlem, hssBoylam, 0)
+            marker.pose.position.x = x
+            marker.pose.position.y = y
+            marker.pose.position.z = 0
+            # Orientation of the cylinder (identity quaternion for no rotation)
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = 1.0
 
-    def heading_callback(self, data):
-        self.heading = float(data.data)
+            # Size of the cylinder (x and y are diameter, z is height)
+            marker.scale.x = hssYaricap  # Diameter of the cylinder
+            marker.scale.y = hssYaricap  # Diameter of the cylinder
+            marker.scale.z = 10000    # Height of the cylinder
+            
+            marker.scale.x = 25.0
+            marker.scale.y = 25.0
+            marker.scale.z = 25.0
 
-    def uav_pose_callback(self, data):
-        self.latitude = float(data.latitude)
-        self.longitude = float(data.longitude)
+            marker.color.a = 1.0
+            marker.color.r = 0.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+            marker_array.markers.append(data)
+        push_mission = rospy.service("/mavros/geofence/push")
+        fence_list = HavaSavunmaKoordinatlari()
+        response = push_mission(0, fence_list)
+        if response.success:
+            rospy.loginfo("Fence list pushed to plane successfully")    
+        self.marker_pub(marker_array)    
+        rospy.loginfo("Published HSS markers")
+        return TriggerResponse(success=True, message="HSS coordinates published successfully")
 
-    def rel_altitude_callback(self, data):
-        self.altitude = float(data.data)
-
-    def state_callback(self, msg):
-        self.state = msg.mode
-
-    def coordinate_callback(self, data):
-        self.geofence_list = data
-
-    def enable_geo_fences(self, req):
+        
+        
+    def enable_geo_fences(self):
         try:
             self.write_mission_to_file()
             self.send_command(CommandCode.DO_FENCE_ENABLE, 1)
@@ -77,7 +109,7 @@ class Air_Defense_Node:
             rospy.logerr(f"Service call failed: {e}")
             return TriggerResponse(success=False)
 
-    def disable_geo_fences(self, req):
+    def disable_geo_fences(self):
         try:
             # Clear the fence-items.txt file
             with open(self.mission_file_path, 'w') as file:

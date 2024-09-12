@@ -36,19 +36,23 @@ project(template_gui_package)  ## this package name is the name of the directory
 set(ROS_DEPENDS
   roscpp
   std_msgs
+  roslib
   )
 
 set(EXTERNAL_DEPENDS
   Qt5Widgets
   Qt5PrintSupport
   #OpenCV
+  jsoncpp
   )
 
 set(EXTERNAL_DEPENDS_LIB
   Qt5::Widgets
   Qt5::PrintSupport
   Qt5::Core
+  jsoncpp_lib
   #${OpenCV_LIBS}
+
   )
 
 set(INCLUDE_DIRECTORIES

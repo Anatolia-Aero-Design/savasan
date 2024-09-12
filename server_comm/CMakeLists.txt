@@ -19,6 +19,8 @@ add_message_files(
   Kilitlenme.msg
   KonumBilgisi.msg
   KonumBilgileri.msg
+  HavaSavunmaKoordinati.msg
+  HavaSavunmaKoordinatlari.msg
 )
 
 # Add service files if any
@@ -26,6 +28,7 @@ add_service_files(
   FILES
   sendlock.srv
   sendqr.srv
+  gethss.srv
 )
 
 # Generate added messages and services with any dependencies listed here

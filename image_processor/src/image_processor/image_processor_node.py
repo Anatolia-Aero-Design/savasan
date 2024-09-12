@@ -18,7 +18,6 @@ class ImageProcessorNode:
         self.server_time = None
         self.image = None
         self.bbox = self.bbox_x = self.bbox_y = self.bbox_w = self.bbox_h = None
-
         # Subscribers using message_filters for synchronization
         self.image_sub = rospy.Subscriber(
             "/camera/image_raw", Image, self.image_callback
@@ -34,6 +33,8 @@ class ImageProcessorNode:
 
     def image_callback(self, msg):
         self.image_msg = msg
+        self.width  = rospy.get_param("/camera_publisher/screen_width")
+        self.height = rospy.get_param("/camera_publisher/screen_height")
         self.callback()
 
     def bbox_callback(self, msg):
@@ -53,10 +54,10 @@ class ImageProcessorNode:
             return
 
         # Draw target area
-        target_box_x = int(1280 * 0.25)
-        target_box_y = int(720 * 0.1)
-        target_box_w = int(1280 * 0.75)
-        target_box_h = int(720 * 0.9)
+        target_box_x = int(self.width * 0.25)
+        target_box_y = int(self.height * 0.1)
+        target_box_w = int(self.width * 0.75)
+        target_box_h = int(self.height * 0.9)
         cv2.rectangle(
             frame,
             (target_box_x, target_box_y),

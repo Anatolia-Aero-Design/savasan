@@ -63,26 +63,10 @@ class Lock_Checker:
         self.kilit_controller = None
         self.bbox = self.bbox_x = self.bbox_y = self.bbox_w = self.bbox_h = None
 
-        self.server_url_kilitlenme_bilgisi = rospy.get_param(
-            "/comm_node/api/kilitlenme_bilgisi"
-        )
         self.xywh_sub = rospy.Subscriber(
             "/yolov8/xywh", Yolo_xywh, self.bbox_callback)
 
         self.kilit_pub = rospy.Publisher("/kilit", Bool, queue_size=60)
-
-        # Draw target area
-        target_box_x = int(1280 * 0.25)
-        target_box_y = int(720 * 0.1)
-        target_box_w = int(1280 * 0.75)
-        target_box_h = int(720 * 0.9)
-        self.target_box_coordinates = (
-            target_box_x,
-            target_box_y,
-            target_box_w,
-            target_box_h,
-        )
-
         self.timer = Timer()
         self.elapsed_time = None
         self.timer_check = False
@@ -95,6 +79,21 @@ class Lock_Checker:
         self.bbox_w = msg.w
         self.bbox_h = msg.h
 
+        # get resolution parameters
+        self.width = rospy.get_param("/camera_publisher/screen_width")
+        self.height = rospy.get_param("/camera_publisher/screen_height")
+
+        # Draw target area
+        target_box_x = int(self.width * 0.25)
+        target_box_y = int(self.height * 0.1)
+        target_box_w = int(self.width * 0.75)
+        target_box_h = int(self.height * 0.9)
+        self.target_box_coordinates = (
+            target_box_x,
+            target_box_y,
+            target_box_w,
+            target_box_h,
+        )
         bbox_coordinates = self.bbox_x, self.bbox_y, self.bbox_w, self.bbox_h
         proportions = self.calculate_lock_on_proportion(
             self.target_box_coordinates, bbox_coordinates
@@ -103,43 +102,61 @@ class Lock_Checker:
             proportions, self.lock_on_controller, self.kilit_controller
         )
         self.send_lock_on_info(kilit, lock_on_status)
-        self.kilit_pub.publish(kilit)        
+        self.kilit_pub.publish(kilit)
 
     # Calculate bounding box proportion to the target area
     def calculate_lock_on_proportion(self, target_coordinates, bbox_coordinates):
-        x_t, y_t, w_t, h_t = target_coordinates
-        target_area = abs(w_t - x_t) * abs(h_t - y_t)
+        bbox_x, bbox_y, bbox_w, bbox_h = bbox_coordinates
+        target_x, target_y, target_w, target_h = target_coordinates
 
-        x_d, y_d, w_d, h_d = bbox_coordinates
-        bbox_area = abs(w_d - x_d) * abs(h_d - y_d)
+        # Calculate bounding box dimensions
+        bbox_width = abs(bbox_w - bbox_x)
+        bbox_height = abs(bbox_h - bbox_y)
+        # Calculate bounding box dimensions
+        bbox_width = abs(bbox_w - bbox_x)
+        bbox_height = abs(bbox_h - bbox_y)
 
-        # Initialize proportions with default values
-        horizontal_proportion = 0
-        vertical_proportion = 0
+        # Calculate proportions
+        horizontal_proportion = bbox_width / self.width
+        vertical_proportion = bbox_height / self.height
 
-        if bbox_area <= target_area:
-            x_o = max(x_t, x_d)
-            y_o = max(y_t, y_d)
-            w_o = min(w_t, w_d)
-            h_o = min(h_t, h_d)
+        # Check minimum proportion (5%)
+        min_proportion = 0.06
+        if horizontal_proportion < min_proportion and vertical_proportion < min_proportion:
+            rospy.logwarn("Bounding box proportions are too small")
+            return 0, 0
 
-            overlap_width = max(0, w_o - x_o)
-            overlap_height = max(0, h_o - y_o)
+        else:
+            # Calculate the intersection between bbox and target_bbox
+            intersect_x = max(bbox_x, target_x)
+            intersect_y = max(bbox_y, target_y)
+            intersect_w = min(bbox_w, target_w)
+            intersect_h = min(bbox_h, target_h)
 
-            horizontal_proportion = (
-                overlap_width / (w_d - x_d) if (w_d - x_d) != 0 else 0
-            )
-            vertical_proportion = (
-                overlap_height / (h_d - y_d) if (h_d - y_d) != 0 else 0
-            )
-        return horizontal_proportion, vertical_proportion
+            # If there's no intersection, return None
+            if intersect_x >= intersect_w or intersect_y >= intersect_h:
+                rospy.logwarn("Target is out of locking area")
+
+            # Calculate intersection width and height
+            intersect_width = intersect_w - intersect_x
+            intersect_height = intersect_h - intersect_y
+
+            try:  # Calculate the proportion of the bounding box that overlaps with the target_bbox
+                intersect_horizontal_proportion = intersect_width / bbox_width
+                intersect_vertical_proportion = intersect_height / bbox_height
+            except ZeroDivisionError as e:
+                return 0, 0
+            # Return the proportions and bounding box
+            return intersect_horizontal_proportion, intersect_vertical_proportion
 
     def lock_on_status(self, proportions, lock_on_status, kilit):
-        if proportions[0] >= 0.93 and proportions[1] >= 0.93:
+        if proportions[0] >= 0.06 and proportions[1] >= 0.06:
             start_time = self.timer.start()
             self.elapsed_time = self.timer.elapsed()
+            rospy.loginfo(self.elapsed_time)
             if self.elapsed_time >= 4.00:
                 lock_on_status = True
+                self.timer.reset()
             if self.elapsed_time > 0.00:
                 kilit = True
             else:
@@ -159,21 +176,21 @@ class Lock_Checker:
         if lock_on_msg == True and tracking_online == 1:
             self.end_time = self.timer.get_current_time()
             try:
-                rospy.wait_for_service("/send_lock_message")
-                send_lock_message = rospy.ServiceProxy("/send_lock_message", sendlock)
-                data = Kilitlenme(start_hour= self.start_time[0],
-                                                        start_min= self.start_time[1],
-                                                        start_second= self.start_time[2],
-                                                        start_milisecond= self.start_time[3]//1000,
-                                                        stop_hour= self.end_time[0],
-                                                        stop_min= self.end_time[1],
-                                                        stop_second= self.end_time[2],
-                                                        stop_milisecond= self.end_time[3]//1000,
-                                                        otonom= 1)
-                rospy.loginfo(data)
+                rospy.wait_for_service("send_lock_message")
+                send_lock_message = rospy.ServiceProxy(
+                    "send_lock_message", sendlock)
+                data = Kilitlenme(start_hour=self.start_time[0],
+                                  start_min=self.start_time[1],
+                                  start_second=self.start_time[2],
+                                  start_milisecond=self.start_time[3]//1000,
+                                  stop_hour=self.end_time[0],
+                                  stop_min=self.end_time[1],
+                                  stop_second=self.end_time[2],
+                                  stop_milisecond=self.end_time[3]//1000,
+                                  otonom=1)
                 response = send_lock_message(data)
                 rospy.loginfo("KITLENDI")
-                rospy.set_param("savasan_gui_node/tracing_online",0)
+                rospy.set_param("savasan_gui_node/tracing_online", 0)
             except Exception as e:
                 rospy.logerr(
                     f"An error occurred while creating lock-on data: {str(e)}")

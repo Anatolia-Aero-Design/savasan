@@ -20,7 +20,7 @@ def camera_publisher():
         rospack = rospkg.RosPack()
         package_path = rospack.get_path("image_handler")
         file_path = os.path.join(package_path, "video/FoggyFPVHeaven.mp4")
-        cap = cv2.VideoCapture(file_path)
+        cap = cv2.VideoCapture(0)
 
         if not cap.isOpened():
             rospy.logerr("Cannot open camera")
@@ -36,6 +36,10 @@ def camera_publisher():
 
         while not rospy.is_shutdown():
             ret, frame = cap.read()
+            height, width = frame.shape[:2]
+            rospy.set_param("/camera_publisher/screen_width", width)
+            rospy.set_param("/camera_publisher/screen_height", height)
+            
             if not ret:
                 rospy.logerr("Cannot read frame")
                 break

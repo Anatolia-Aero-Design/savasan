@@ -399,7 +399,7 @@ QTabBar {
     <enum>QTabWidget::Rounded</enum>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>3</number>
    </property>
    <property name="elideMode">
     <enum>Qt::ElideNone</enum>
@@ -768,7 +768,7 @@ QPushButton:pressed {
 </string>
         </property>
         <property name="text">
-         <string>Load Mission</string>
+         <string>PushButton</string>
         </property>
        </widget>
       </item>

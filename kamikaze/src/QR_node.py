@@ -16,14 +16,8 @@ class QR_Node:
         self.qr_data = ""
         self.image_sub = None
         
-
-        # Initialize publishers 
-        self.qr_pub = rospy.Publisher('/qr_code_data', String, queue_size=10)
         self.image_pub = rospy.Publisher('camera/kamikaze_image', Image, queue_size=60)
-        self.attitude_pub = rospy.Publisher('/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
-        # Get server API as parameter
-        self.server_url_kamikaze_bilgisi = rospy.get_param('/comm_node/api/kamikaze_bilgisi')
-        
+     
         # Services to start and stop tracking
         self.start_service = rospy.Service(
             'start_Qr', Trigger, self.start_qr)
@@ -52,20 +46,21 @@ class QR_Node:
         return self.read
     
     def process_image(self, image):
+        image = utils.convert_to_grayscale(image)
+        image = utils.edge_detection(image)
         image = utils.adjust_brightness_contrast(image, brightness=30, contrast=20)
         image = utils.gamma_correction(image, gamma=1.2)
         image = utils.noise_reduction(image)
-        image = utils.adaptive_threshold(image)
         return image
     
     def qr_reader(self, frame):
         image = self.process_image(frame)
-        decoded_objects = decode(image)
+        decoded_objects = decode(frame)
+
         if decoded_objects:
             self.read = True
             for obj in decoded_objects:
                 self.qr_data = obj.data.decode("utf-8")
-                self.qr_pub.publish(self.qr_data)
                 rospy.loginfo(f"QR Code Data: {self.qr_data}")
         else:
             self.read = False
