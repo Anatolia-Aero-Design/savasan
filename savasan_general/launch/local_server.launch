@@ -7,7 +7,7 @@
     <arg name="log_output"          default="screen" />
     <arg name="fcu_protocol"        default="v2.0" />
     <arg name="respawn_mavros"      default="true" />
-    <arg name="gui"                 default="true" />
+    <arg name="gui"                 default="false" />
 
     <include file="$(find mavros)/launch/node.launch">
         <arg name="pluginlists_yaml" value="$(find savasan_general)/launch/apm_pluginlists.yaml" />
@@ -56,7 +56,7 @@
     <node name="image_processor_node"  pkg="image_processor"   type="image_processor_node.py"  output="screen"/>
     <node name="image_save"            pkg="image_processor"   type="image_save.py"            output="screen"/>
     <node name="gps_navigator"         pkg="gps_navigator"     type="gps_navigator_node.py"    output="screen"/>
-    <node name="air_defense_node"      pkg="hss"               type="air_defense_node.py"      output="screen"/>
+    <node name="air_defense_node"      pkg="server_comm"       type="hss.py"                   output="screen"/>
     <node name="uav_visualization"     pkg="uav_visualization" type="iha_subscriber.py"        output="screen"/>
     <node name="plane_model"           pkg="uav_visualization" type="plane_model.py"           output="screen"/>
     <node name="home_gps_publisher"    pkg="savasan_general"   type="home_gps_publisher,py"    output="screen"/> 

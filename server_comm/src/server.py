@@ -13,7 +13,7 @@ def update_data():
     json_data = request.get_json()
     competition.update_contestant(request.get_json('takim_numarasi') , json_data)
     response = competition.response_json()
-    
+    print(f"telemetri data: {json_data}")
     return jsonify(response), 200
 
 @app.route('/api/sunucusaati', methods=['GET'])
@@ -28,8 +28,8 @@ def hss_coordinates():
         "hss_koordinat_bilgileri": [
             {
                 "id": 0,
-                "hssEnlem": 36.939879,
-                "hssBoylam": 35.532268,
+                "hssEnlem": 36.937447,
+                "hssBoylam": 35.563283,
                 "hssYaricap": 50
             },
             {
@@ -73,6 +73,13 @@ def kenetlenme_bilgisi_gonder():
     response = competition.response_json()
 
     return jsonify({"status": "success"}), 200
+
+@app.route('/api/kamikaze_bilgisi', methods=['POST'])
+def get_qr_data():
+    json_data = request.get_json()
+    print(f"qr data: {json_data}")
+    return jsonify({"qr data": json_data}), 200
+
                
 if __name__ == '__main__':
     competition = Competition()
