@@ -22,7 +22,7 @@ import threading
 class Comm_Node:
     def __init__(self):
         self.session = requests.Session()
-        self.base_url = "http://savasaniha.baykartech.com/api"
+        self.base_url = "http://127.0.0.1:5000/api"
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
         self.team_number = 32
@@ -268,7 +268,8 @@ class Comm_Node:
             rospy.loginfo(response.json())
             self.team_number = response.json()
         else:
-            rospy.logerr(f"Failed to login. Status code: {response.status_code}")
+            rospy.logerr(
+                f"Failed to login. Status code: {response.status_code}")
             rospy.logerr("Response:", response.text)
         return response
 

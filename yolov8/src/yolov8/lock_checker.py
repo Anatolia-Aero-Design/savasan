@@ -5,7 +5,7 @@ from datetime import datetime
 import requests
 import rospy
 from image_processor.msg import Yolo_xywh  # Import the custom message#
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool,String
 import time
 from server_comm.srv import sendlock, sendlockRequest
 from server_comm.msg import Kilitlenme
@@ -67,6 +67,23 @@ class Lock_Checker:
             "/yolov8/xywh", Yolo_xywh, self.bbox_callback)
 
         self.kilit_pub = rospy.Publisher("/kilit", Bool, queue_size=60)
+        self.param_name = "elapsed_time"
+
+
+        self.screen_width = 1280
+        self.screen_height = 720
+        # Draw target area
+        target_box_x = int(self.screen_width * 0.25)
+        target_box_y = int(self.screen_height * 0.1)
+        target_box_w = int(self.screen_width * 0.75)
+        target_box_h = int(self.screen_height * 0.9)
+        self.target_box_coordinates = (
+            target_box_x,
+            target_box_y,
+            target_box_w,
+            target_box_h,
+        )
+
         self.timer = Timer()
         self.elapsed_time = None
         self.timer_check = False
@@ -153,6 +170,8 @@ class Lock_Checker:
         if proportions[0] >= 0.06 and proportions[1] >= 0.06:
             start_time = self.timer.start()
             self.elapsed_time = self.timer.elapsed()
+            elapsed_time_str = self.timer.format_time(self.elapsed_time) if self.elapsed_time else "00:00.00"
+            rospy.set_param(self.param_name, elapsed_time_str)
             rospy.loginfo(self.elapsed_time)
             if self.elapsed_time >= 4.00:
                 lock_on_status = True

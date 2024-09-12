@@ -16,25 +16,17 @@ from visualization_msgs.msg import Marker, MarkerArray
 import pymap3d as pm
 from mavros_msgs.msg import HomePosition
 import numpy as np
+from visualization_msgs.msg import Marker, MarkerArray
+import pymap3d as pm
+from mavros_msgs.msg import HomePosition
+import numpy as np
 
 # Plane does not support NAV_FENCE_CIRCLE_EXCLUSION
 
 
 class Air_Defense_Node:
     def __init__(self) -> None:
-        # Initialize variables
-        self.uav_pose_sub = None
-        self.latitude = None
-        self.longitude = None
-        self.altitude = None
-        self.state = None
-        self.heading = None
-        self.hss_coordinates = None
 
-        rospack = rospkg.RosPack()
-        package_path = rospack.get_path("hss")
-        self.mission_file_path = os.path.join(
-            package_path, "mission_folder/fence-items.txt")
         self.home_sub = rospy.Subscriber(
             '/mavros/home_position/home', HomePosition, self.home_callback)
         self.hss_sub = rospy.Subscriber(
@@ -62,8 +54,11 @@ class Air_Defense_Node:
 
     def hss_callback(self, data):
         self.hss_coordinates = data
+        print(self.hss_coordinates)
 
     def push_hss_coordinates_callback(self, req):
+
+        rospy.wait_for_service("/mavros/geofence/push")
 
         marker = Marker()
         marker.header.frame_id = "map"
@@ -107,17 +102,14 @@ class Air_Defense_Node:
 
             # Set color (green)
             marker.color.a = 0.2
-            marker.color.r = 1.0
-            marker.color.g = 0.0
+            marker.color.r = 0.0
+            marker.color.g = 1.0
             marker.color.b = 0.0
 
             # Append the marker to the array
             marker_array.markers.append(marker)
-
-        # Publish the MarkerArray
-        self.marker_pub.publish(marker_array)
-        rospy.loginfo("Published HSS markers")
-        return TriggerResponse(success=True, message="HSS coordinates published successfully")
+            self.marker_pub.publish(marker_array)
+            rospy.loginfo("Published HSS markers")
 
     def enable_geo_fences(self):
         try:
