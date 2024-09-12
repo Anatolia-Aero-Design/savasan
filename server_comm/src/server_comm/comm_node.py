@@ -3,11 +3,9 @@
 from unittest import result
 import rospy
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix, TimeReference
-from nav_msgs.msg import Odometry
-from server_comm.srv._gethss import gethssResponse
 from std_msgs.msg import Float64, Bool, String
 from std_srvs.srv import Trigger
-from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse, gethss
+from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse, gethss,gethssResponse
 
 
 from geometry_msgs.msg import TwistStamped
@@ -24,7 +22,7 @@ import threading
 class Comm_Node:
     def __init__(self):
         self.session = requests.Session()
-        self.base_url = "http://savasaniha.baykartech.com/api"
+        self.base_url = "http://127.0.0.1:5000/api"
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
         self.team_number = 69
@@ -42,7 +40,7 @@ class Comm_Node:
         )
 
         self.get_hss_coordinate_message = rospy.Service(
-            "get_hss_coordinate_message", gethss, self.parse_and_publish_hss_coordinates_callback)
+            "get_hss_coordinates", gethss, self.get_hss_coordinates)
 
         self.send_lock_message = rospy.Service(
             "send_lock_message", sendlock, self.send_lock_callback)
@@ -108,8 +106,8 @@ class Comm_Node:
         self.konum_pub = rospy.Publisher(
             "/konum_bilgileri", KonumBilgileri, queue_size=10
         )
-        self.hss_coordinate_pub = rospy.Publisher(
-            "/hss_coordinates", HavaSavunmaKoordinatlari)
+        self.hss_pub=rospy.Publisher(
+            "/hss_locations", HavaSavunmaKoordinatlari, queue_size=10)
 
         # Create a thread for sending telemetry data
         self.telemetry_thread = threading.Thread(target=self.send_telem_loop)
@@ -125,15 +123,26 @@ class Comm_Node:
             self.sent_telem()
             rate.sleep()
 
-    def get_hss_coordinates(self):
+    def get_hss_coordinates(self,_):
         try:
             url = f'{self.base_url}/hss_koordinatlari'
             response = self.session.get(url)
+            data_HavaSavunmaKoordinatlari = HavaSavunmaKoordinatlari()
+            
             if response.status_code == 200:
-                response.json().get('hss_koordinat_bilgileri')
+                response_data = response.json().get('hss_koordinat_bilgileri')
+                for data in response_data:
+                    data_HavaSavunmaKoordinati = HavaSavunmaKoordinati()
+                    data_HavaSavunmaKoordinati.hssBoylam = data["hssBoylam"]
+                    data_HavaSavunmaKoordinati.hssYaricap = data["hssYaricap"]
+                    data_HavaSavunmaKoordinati.hssEnlem = data["hssEnlem"]
+                    data_HavaSavunmaKoordinati.id = data["id"]
+                    data_HavaSavunmaKoordinatlari.hss_Koordinati.append(data_HavaSavunmaKoordinati)
+                
                 rospy.loginfo(
                     f"Air defense coordinates retrieved successfully")
-                return gethssResponse(success=1, result=response.status_code)
+                self.hss_pub.publish(data_HavaSavunmaKoordinatlari)
+                return gethssResponse(success=1, result=response.status_code, data=data_HavaSavunmaKoordinatlari)
             else:
                 rospy.logerr(
                     f"Failed to retrieve air defense coordinates, status code: {response.status_code}")
@@ -158,9 +167,6 @@ class Comm_Node:
                 hss_coordinate.hssYaricap = item["hssYaricap"]
 
                 hss_koordinatlari_msg.hss_Koordinati.append(hss_coordinate)
-
-            self.hss_coordinate_pub.publish(hss_koordinatlari_msg)
-            rospy.loginfo("Published hss_Koordinati message.")
 
         except Exception as e:
             rospy.logerr(
