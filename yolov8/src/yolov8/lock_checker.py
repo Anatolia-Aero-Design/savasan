@@ -189,7 +189,7 @@ class Lock_Checker:
                                   stop_milisecond=self.end_time[3]//1000,
                                   otonom=1)
                 response = send_lock_message(data)
-                rospy.loginfo("KITLENDI")
+                rospy.loginfo("KITLENDI VIKTORRRR")
                 rospy.set_param("savasan_gui_node/tracing_online", 0)
             except Exception as e:
                 rospy.logerr(

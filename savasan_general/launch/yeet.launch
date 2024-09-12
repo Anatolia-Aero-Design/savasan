@@ -54,6 +54,7 @@
     <node name="uav_visualization"      pkg="uav_visualization" type="iha_subscriber.py"        output="screen"/>
     <node name="plane_model"            pkg="uav_visualization" type="plane_model.py"           output="screen"/>
     <node name="home_gps_publisher"     pkg="savasan_general"   type="home_gps_publisher,py"    output="screen"/> 
+    <node name="air_defense_node"       pkg="server_comm"       type="hss.py"                   output="screen"/>  
 
     <!-- Start RViz with the specified configuration file -->
     <node pkg="tf"            type="static_transform_publisher" name="odom_to_map_broadcaster" args="0 0 0 0 0 0 map odom 100" />

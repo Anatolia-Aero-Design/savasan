@@ -35,7 +35,7 @@ class ImageProcessorNode:
 
     def image_callback(self, msg):
         self.image_msg = msg
-        self.width  = rospy.get_param("/camera_publisher/screen_width")
+        self.width = rospy.get_param("/camera_publisher/screen_width")
         self.height = rospy.get_param("/camera_publisher/screen_height")
         self.callback()
 
@@ -110,27 +110,29 @@ class ImageProcessorNode:
             (0, 0, 0),
             2,
         )
-        
+
     def overlay_timer_info(self, frame):
         # Define the font and size
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 1.5  # Increase this value for a larger font
-        font_thickness = 4
+        font_thickness = 2
         font_color = (0, 0, 0)  # Text color (green)
-        
+
         # Get the size of the text
-        text_size, _ = cv2.getTextSize(self.elapsed_time, font, font_scale, font_thickness)
-        
+        text_size, _ = cv2.getTextSize(
+            self.elapsed_time, font, font_scale, font_thickness)
+
         # Define the target box coordinates
-        target_box_x = int(1280 * 0.25)
-        target_box_y = int(720 * 0.1)
-        target_box_w = int(1280 * 0.75)
-        target_box_h = int(720 * 0.9)
-        
+        target_box_x = int(self.width * 0.25)
+        target_box_y = int(self.height * 0.1)
+        target_box_w = int(self.width * 0.75)
+        target_box_h = int(self.height * 0.9)
+
         # Position the text right outside the right side of the target box
         text_x = target_box_w + 10  # 10 pixels to the right of the box
-        text_y = target_box_y + (target_box_h - target_box_y + text_size[1]) // 2
-        
+        text_y = target_box_y + \
+            (target_box_h - target_box_y + text_size[1]) // 2
+
         # Overlay the text
         cv2.putText(
             frame,
@@ -141,8 +143,6 @@ class ImageProcessorNode:
             font_color,
             font_thickness,
         )
-
-
 
 
 if __name__ == "__main__":

@@ -14,6 +14,8 @@ from geometry_msgs.msg import PoseStamped, Vector3
 from QR_node import QR_Node
 from datetime import datetime
 
+# Deprecated node // left for future development purposes
+
 class PIDController:
     def __init__(self, kp, ki, kd):
         self.kp = kp

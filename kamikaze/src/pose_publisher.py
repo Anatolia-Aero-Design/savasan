@@ -10,48 +10,55 @@ import utilities as utils
 from visualization_msgs.msg import Marker
 import tf.transformations as tf
 
+
 class PosePublisherNode:
-    def __init__(self) -> None:    
+    def __init__(self) -> None:
         # Initialize variables
         self.uav_position = None
         self.home_pose = None
-        
+
         # Constants
-        self.TARGET_LATITUDE = 39.82006598 
-        self.TARGET_LONGITUDE =  30.53404039
-        self.TARGET_ALTITUDE = 0
+        self.TARGET_LATITUDE = rospy.get_param("/comm_node/Target_Lat")
+        self.TARGET_LONGITUDE = rospy.get_param("/comm_node/Target_Lon")
+        self.TARGET_ALTITUDE = rospy.get_param("/comm_node/Target_Alt")
 
         # Subscribers
-        self.uav_pose_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.uav_pose_callback)
-        self.home_sub = rospy.Subscriber('/mavros/home_position/home', HomePosition, self.home_callback)
+        self.uav_pose_sub = rospy.Subscriber(
+            '/mavros/local_position/pose', PoseStamped, self.uav_pose_callback)
+        self.home_sub = rospy.Subscriber(
+            '/mavros/home_position/home', HomePosition, self.home_callback)
 
         # Publisher
-        self.vector_pub = rospy.Publisher('/uav_to_target_vector', Vector3, queue_size=10)
-        self.vector_marker_pub = rospy.Publisher('/uav_to_target_marker', Marker, queue_size=10)
-            
+        self.vector_pub = rospy.Publisher(
+            '/uav_to_target_vector', Vector3, queue_size=10)
+        self.vector_marker_pub = rospy.Publisher(
+            '/uav_to_target_marker', Marker, queue_size=10)
+
     def uav_pose_callback(self, data):
-        uav_orient = utils.quaternion_to_euler(data.pose.orientation.w,data.pose.orientation.x,data.pose.orientation.y,data.pose.orientation.z)
-        self.uav_position = np.array([data.pose.position.x, data.pose.position.y, data.pose.position.z,uav_orient[0],uav_orient[1],uav_orient[2]])
+        uav_orient = utils.quaternion_to_euler(
+            data.pose.orientation.w, data.pose.orientation.x, data.pose.orientation.y, data.pose.orientation.z)
+        self.uav_position = np.array([data.pose.position.x, data.pose.position.y,
+                                     data.pose.position.z, uav_orient[0], uav_orient[1], uav_orient[2]])
         self.publish_vector(data)
 
     def home_callback(self, data):
-        self.home_pose = np.array([data.geo.latitude, data.geo.longitude, data.geo.altitude])
+        self.home_pose = np.array(
+            [data.geo.latitude, data.geo.longitude, data.geo.altitude])
 
     def publish_vector(self, data):
         if self.uav_position is not None and self.home_pose is not None:
             try:
-                x_enu, y_enu, z_enu = utils.gps_to_xyz(self.home_pose[0], self.home_pose[1], 0, self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
+                x_enu, y_enu, z_enu = utils.gps_to_xyz(
+                    self.home_pose[0], self.home_pose[1], 0, self.TARGET_LATITUDE, self.TARGET_LONGITUDE, self.TARGET_ALTITUDE)
 
-
-                
                 # Calculate the vector between the target and UAV position
-                vector_body =  np.array([x_enu, y_enu, z_enu]) - np.array(self.uav_position)[:3]
+                vector_body = np.array(
+                    [x_enu, y_enu, z_enu]) - np.array(self.uav_position)[:3]
 
                 vector = Vector3()
                 vector.x = vector_body[0]
                 vector.y = vector_body[1]
                 vector.z = vector_body[2]
-
 
                 marker = Marker()
                 marker.header.frame_id = "map"
@@ -73,8 +80,8 @@ class PosePublisherNode:
 
                 marker.points.append(start_point)
                 marker.points.append(end_point)
-                
-                            # Initialize the orientation to identity quaternion
+
+                # Initialize the orientation to identity quaternion
                 marker.pose.orientation = Quaternion()
                 marker.pose.orientation.x = 0.0
                 marker.pose.orientation.y = 0.0
@@ -92,11 +99,13 @@ class PosePublisherNode:
 
                 self.vector_marker_pub.publish(marker)
                 self.vector_pub.publish(vector)
-                
+
             except Exception as e:
                 rospy.logerr(f"Failed to publish vector: {e}")
         else:
             rospy.logwarn("UAV position or home pose not available yet.")
+
+
 if __name__ == '__main__':
     try:
         rospy.init_node('pose_publisher_node', anonymous=True)

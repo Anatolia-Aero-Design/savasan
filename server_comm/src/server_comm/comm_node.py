@@ -5,7 +5,7 @@ import rospy
 from sensor_msgs.msg import Imu, BatteryState, NavSatFix, TimeReference
 from std_msgs.msg import Float64, Bool, String
 from std_srvs.srv import Trigger
-from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse, gethss,gethssResponse
+from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse, gethss, gethssResponse
 
 
 from geometry_msgs.msg import TwistStamped
@@ -106,7 +106,7 @@ class Comm_Node:
         self.konum_pub = rospy.Publisher(
             "/konum_bilgileri", KonumBilgileri, queue_size=10
         )
-        self.hss_pub=rospy.Publisher(
+        self.hss_pub = rospy.Publisher(
             "/hss_locations", HavaSavunmaKoordinatlari, queue_size=10)
 
         # Create a thread for sending telemetry data
@@ -123,12 +123,12 @@ class Comm_Node:
             self.sent_telem()
             rate.sleep()
 
-    def get_hss_coordinates(self,_):
+    def get_hss_coordinates(self, _):
         try:
             url = f'{self.base_url}/hss_koordinatlari'
             response = self.session.get(url)
             data_HavaSavunmaKoordinatlari = HavaSavunmaKoordinatlari()
-            
+
             if response.status_code == 200:
                 response_data = response.json().get('hss_koordinat_bilgileri')
                 for data in response_data:
@@ -137,8 +137,9 @@ class Comm_Node:
                     data_HavaSavunmaKoordinati.hssYaricap = data["hssYaricap"]
                     data_HavaSavunmaKoordinati.hssEnlem = data["hssEnlem"]
                     data_HavaSavunmaKoordinati.id = data["id"]
-                    data_HavaSavunmaKoordinatlari.hss_Koordinati.append(data_HavaSavunmaKoordinati)
-                
+                    data_HavaSavunmaKoordinatlari.hss_Koordinati.append(
+                        data_HavaSavunmaKoordinati)
+
                 rospy.loginfo(
                     f"Air defense coordinates retrieved successfully")
                 self.hss_pub.publish(data_HavaSavunmaKoordinatlari)
@@ -211,7 +212,6 @@ class Comm_Node:
                      "milisaniye": data_calback.data.stop_milisecond
                      },
                 "qrMetni": data_calback.data.qr_text}
-        print(data)
         url = f'{self.base_url}/kamikaze_bilgisi'
         response = self.session.post(
             url, json=data, headers=self.header, timeout=10)
@@ -255,7 +255,6 @@ class Comm_Node:
             self.kilit = 1
         else:
             self.kilit = 0
-        
 
     def login(self):
         url = f"{self.base_url}/giris"
@@ -265,12 +264,12 @@ class Comm_Node:
         response = self.session.post(
             url, json=data, headers=headers, timeout=10)
         if response.status_code == 200:
-            print("Login successful!")
-            print(response.json())
+            rospy.logwarn("Login successful!")
+            rospy.loginfo(response.json())
             self.team_number = response.json()
         else:
-            print(f"Failed to login. Status code: {response.status_code}")
-            print("Response:", response.text)
+            rospy.logerr(f"Failed to login. Status code: {response.status_code}")
+            rospy.logerr("Response:", response.text)
         return response
 
     def sent_telem(self):

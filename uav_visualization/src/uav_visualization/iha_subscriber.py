@@ -12,14 +12,14 @@ import numpy as np
 
 # WGS84 ellipsoid constants
 a = 6378137.0         # Semi-major axis
-f = 1 / 298.257223563 # Flattening
-e2 = 2*f - f**2  
+f = 1 / 298.257223563  # Flattening
+e2 = 2*f - f**2
 
 
-#TODO: the home point is wrong
+# TODO: the home point is wrong
 def geodetic_to_enu(lat, lon, alt):
 
-    lat_ref =  rospy.get_param("/comm_node/Home_Lat")
+    lat_ref = rospy.get_param("/comm_node/Home_Lat")
     lon_ref = rospy.get_param("/comm_node/Home_Lon")
 
     alt_ref = 0
@@ -50,17 +50,21 @@ def geodetic_to_enu(lat, lon, alt):
 
     # Transform ECEF to ENU
     t = np.array([[-np.sin(lon_ref), np.cos(lon_ref), 0],
-                  [-np.sin(lat_ref)*np.cos(lon_ref), -np.sin(lat_ref)*np.sin(lon_ref), np.cos(lat_ref)],
+                  [-np.sin(lat_ref)*np.cos(lon_ref), -np.sin(lat_ref)
+                   * np.sin(lon_ref), np.cos(lat_ref)],
                   [np.cos(lat_ref)*np.cos(lon_ref), np.cos(lat_ref)*np.sin(lon_ref), np.sin(lat_ref)]])
 
     enu = np.dot(t, np.array([dx, dy, dz]))
-    
+
     return enu
 
 
 wgs84 = CRS.from_epsg(4326)  # GPS coordinates (WGS84)
-utm_zone33 = CRS.from_proj4("+proj=utm +zone=55 +datum=WGS84 +units=m +no_defs")  # UTM projection
+utm_zone33 = CRS.from_proj4(
+    "+proj=utm +zone=55 +datum=WGS84 +units=m +no_defs")  # UTM projection
 transformer = Transformer.from_crs(wgs84, utm_zone33)
+
+
 def callback(data: KonumBilgileri):
     # Parsing the incoming message
     marker_array = MarkerArray()
@@ -69,8 +73,6 @@ def callback(data: KonumBilgileri):
             continue
         marker = create_marker(iha)
         marker_array.markers.append(marker)
-
-
 
     # Assign unique IDs to each marker in the array
     for i, marker in enumerate(marker_array.markers):
@@ -110,13 +112,16 @@ def create_marker(iha: KonumBilgisi):
 
     return marker
 
+
 def listener():
     rospy.init_node('iha_subscriber', anonymous=True)
     rospy.Subscriber("/konum_bilgileri", KonumBilgileri, callback)
     rospy.spin()
 
+
 if __name__ == '__main__':
-    marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+    marker_pub = rospy.Publisher(
+        'visualization_marker_array', MarkerArray, queue_size=10)
     try:
         listener()
     except rospy.ROSInterruptException:

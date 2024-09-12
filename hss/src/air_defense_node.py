@@ -12,7 +12,7 @@ import math
 import rospkg
 import os
 
-# Plane does not support NAV_FENCE_CIRCLE_EXCLUSION
+# deprecated Node // will not used during competition it is left for future development purposes
 
 class Air_Defense_Node:
     def __init__(self) -> None:

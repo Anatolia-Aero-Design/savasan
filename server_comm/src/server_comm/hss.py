@@ -19,6 +19,7 @@ import numpy as np
 
 # Plane does not support NAV_FENCE_CIRCLE_EXCLUSION
 
+
 class Air_Defense_Node:
     def __init__(self) -> None:
         # Initialize variables
@@ -29,23 +30,27 @@ class Air_Defense_Node:
         self.state = None
         self.heading = None
         self.hss_coordinates = None
-        
+
         rospack = rospkg.RosPack()
         package_path = rospack.get_path("hss")
-        self.mission_file_path = os.path.join(package_path, "mission_folder/fence-items.txt")
-        self.home_sub = rospy.Subscriber('/mavros/home_position/home', HomePosition, self.home_callback)
+        self.mission_file_path = os.path.join(
+            package_path, "mission_folder/fence-items.txt")
+        self.home_sub = rospy.Subscriber(
+            '/mavros/home_position/home', HomePosition, self.home_callback)
         self.hss_sub = rospy.Subscriber(
-                "hss_locations", HavaSavunmaKoordinatlari, self.hss_callback
-            )
-        
-        self.marker_pub = rospy.Publisher("hss_marker", MarkerArray,queue_size=10)
+            "hss_locations", HavaSavunmaKoordinatlari, self.hss_callback
+        )
+
+        self.marker_pub = rospy.Publisher(
+            "hss_marker", MarkerArray, queue_size=10)
 
         # Set up service proxies
         self.waypoint_push_srv = rospy.ServiceProxy(
             '/mavros/mission/push', WaypointPush)
-        
+
         self.push_hss_coordinates = rospy.Service(
             "push_hss_coordinates", Trigger, self.push_hss_coordinates_callback)
+
     def home_callback(self, data):
         self.home_pose = np.array(
             [data.geo.latitude, data.geo.longitude, data.geo.altitude]
@@ -54,17 +59,12 @@ class Air_Defense_Node:
         self.HOME_LONGITUDE = self.home_pose[1]
         self.HOME_ALTITUDE = self.home_pose[2]
         return self.HOME_ALTITUDE, self.HOME_LONGITUDE, self.HOME_LATITUDE
-        
-        
-    def hss_callback(self,data):
+
+    def hss_callback(self, data):
         self.hss_coordinates = data
-        print(self.hss_coordinates)
-        
-    def push_hss_coordinates_callback(self,req):
-        
-        
-        
-        
+
+    def push_hss_coordinates_callback(self, req):
+
         marker = Marker()
         marker.header.frame_id = "map"
         marker.header.stamp = rospy.Time.now()
@@ -77,7 +77,8 @@ class Air_Defense_Node:
             hssBoylam = data.hssBoylam
             hssYaricap = data.hssYaricap
             # Conversion from geodetic to ENU
-            x, y, z = pm.geodetic2enu(hssEnlem, hssBoylam, 0, self.HOME_LATITUDE, self.HOME_LONGITUDE, self.HOME_ALTITUDE)
+            x, y, z = pm.geodetic2enu(
+                hssEnlem, hssBoylam, 0, self.HOME_LATITUDE, self.HOME_LONGITUDE, self.HOME_ALTITUDE)
 
         # Create the marker (Cylinder)
             marker = Marker()
@@ -91,7 +92,8 @@ class Air_Defense_Node:
             # Set position and orientation
             marker.pose.position.x = x
             marker.pose.position.y = y
-            marker.pose.position.z = 500  # Half of the height (since height is centered)
+            # Half of the height (since height is centered)
+            marker.pose.position.z = 500
 
             marker.pose.orientation.x = 0.0
             marker.pose.orientation.y = 0.0
@@ -105,8 +107,8 @@ class Air_Defense_Node:
 
             # Set color (green)
             marker.color.a = 0.2
-            marker.color.r = 0.0
-            marker.color.g = 1.0
+            marker.color.r = 1.0
+            marker.color.g = 0.0
             marker.color.b = 0.0
 
             # Append the marker to the array
@@ -116,8 +118,7 @@ class Air_Defense_Node:
         self.marker_pub.publish(marker_array)
         rospy.loginfo("Published HSS markers")
         return TriggerResponse(success=True, message="HSS coordinates published successfully")
-        
-        
+
     def enable_geo_fences(self):
         try:
             self.write_mission_to_file()
@@ -224,6 +225,7 @@ class Air_Defense_Node:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         distance = 6371000 * c
         return distance
+
 
 if __name__ == '__main__':
     try:

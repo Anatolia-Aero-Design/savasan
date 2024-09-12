@@ -5,7 +5,7 @@ from sensor_msgs.msg import Image, Imu
 from mavros_msgs.msg import AttitudeTarget
 from cv_bridge import CvBridge, CvBridgeError
 from ultralytics import YOLO
-from std_srvs.srv import Trigger,TriggerResponse
+from std_srvs.srv import Trigger, TriggerResponse
 from image_processor.msg import Yolo_xywh  # Import the custom message#
 import cv2
 import time
@@ -26,7 +26,7 @@ class YOLOv8TrackingNode:
             '/mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=10)
         self.bbox_pub = rospy.Publisher(
             "/yolov8/xywh", Yolo_xywh, queue_size=60)
-        
+
         rospack = rospkg.RosPack()
         package_path = rospack.get_path('yolov8')
         file_path = os.path.join(package_path, 'model/best_s.pt')
@@ -49,7 +49,6 @@ class YOLOv8TrackingNode:
             return TriggerResponse(success=1)
         except:
             return TriggerResponse(success=0)
-
 
     def stop_tracking(self, req):
         try:
@@ -83,11 +82,6 @@ class YOLOv8TrackingNode:
         t2 = time.time()
         t3 = time.time()
         result = results[0].boxes.xyxy.cpu().numpy()
-        try:
-            track_ids = results[0].boxes.id.int().cpu().tolist()
-        except AttributeError:
-            pass
-        frame = results[0].plot()
 
         if len(result > 0):
             self.xyxy.header.stamp = data.header.stamp
