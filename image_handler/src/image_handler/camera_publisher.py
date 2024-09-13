@@ -14,21 +14,21 @@ def camera_publisher():
 
     bridge = CvBridge()
     while 1:
-        gst_pipeline = "udpsrc port=5600 ! application/x-rtp,media=video,clock-rate=90000,encoding-name=H264 !\
-                        rtph264depay ! avdec_h264 ! videoconvert ! appsink"  # used for connecting to gazebo sim camera. This path is given to VideoCapture()
+        """gst_pipeline = "udpsrc port=5600 ! application/x-rtp,media=video,clock-rate=90000,encoding-name=H264 !\
+                        rtph264depay ! avdec_h264 ! videoconvert ! appsink"  # used for connecting to gazebo sim camera. This path is given to VideoCapture()"""
 
         rospack = rospkg.RosPack()
         package_path = rospack.get_path("image_handler")
         file_path = os.path.join(package_path, "video/FoggyFPVHeaven.mp4")
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(1,cv2.CAP_V4L2)
 
         if not cap.isOpened():
             rospy.logerr("Cannot open camera")
             return
         # Get the camera's frame rate
-        fps = cap.get(cv2.CAP_PROP_FPS)
+        fps = cap.get(40)
         if fps == 0:  # if the FPS value is not valid, set a default value
-            fps = 30
+            fps = 40
             rospy.logwarn("Unable to fetch FPS from camera, setting default FPS to 30")
 
         rospy.loginfo(f"Camera FPS: {fps}")
@@ -41,6 +41,7 @@ def camera_publisher():
                 break
 
             try:
+
                 ros_image = bridge.cv2_to_imgmsg(frame, "bgr8")
                 ros_image.header.stamp = rospy.Time.now()
                 pub.publish(ros_image)
