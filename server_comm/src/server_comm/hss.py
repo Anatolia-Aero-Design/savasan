@@ -8,7 +8,9 @@ from mavros_msgs.srv import CommandInt, SetMode
 from mavros_msgs.msg import CommandCode, State
 from std_srvs.srv import Trigger, TriggerResponse
 from std_msgs.msg import Float64
-from mavros_msgs.srv import WaypointPush
+from mavros_msgs.srv import WaypointPush, WaypointPushRequest
+from mavros_msgs.msg import Waypoint
+
 import math
 import rospkg
 import os
@@ -27,8 +29,6 @@ import numpy as np
 class Air_Defense_Node:
     def __init__(self) -> None:
 
-        self.home_sub = rospy.Subscriber(
-            '/mavros/home_position/home', HomePosition, self.home_callback)
         self.hss_sub = rospy.Subscriber(
             "hss_locations", HavaSavunmaKoordinatlari, self.hss_callback
         )
@@ -43,18 +43,33 @@ class Air_Defense_Node:
         self.push_hss_coordinates = rospy.Service(
             "push_hss_coordinates", Trigger, self.push_hss_coordinates_callback)
 
-    def home_callback(self, data):
-        self.home_pose = np.array(
-            [data.geo.latitude, data.geo.longitude, data.geo.altitude]
-        )
-        self.HOME_LATITUDE = self.home_pose[0]
-        self.HOME_LONGITUDE = self.home_pose[1]
-        self.HOME_ALTITUDE = self.home_pose[2]
-        return self.HOME_ALTITUDE, self.HOME_LONGITUDE, self.HOME_LATITUDE
+        self.push_empty_fence = rospy.Service(
+            "push_empty_fence", Trigger, self.push_empty_fence_callback)
+
+        self.push_wp = rospy.ServiceProxy(
+            '/mavros/geofence/push', WaypointPush)
+        self.hss_coordinates = HavaSavunmaKoordinatlari()
 
     def hss_callback(self, data):
         self.hss_coordinates = data
-        print(self.hss_coordinates)
+
+    def draw_empty_fences(self):
+        coordinates = [[36.942314, 35.563323], [36.942673, 35.553363], [
+            36.937683, 35.553324], [36.937864, 35.562873]]
+        fence_points = WaypointPushRequest()
+        for index, coordinate in enumerate(coordinates):
+            fence_point = Waypoint()
+            fence_point.frame = 3  # GLOBAL (relative altitude)
+            fence_point.command = 5001  # NAV_FENCE_POINT
+            fence_point.is_current = False  # Not a current waypoint
+            fence_point.autocontinue = True  # Autocontinue
+            fence_point.param1 = 4
+            fence_point.param2 = index
+            fence_point.x_lat = coordinate[0]  # Latitude
+            fence_point.y_long = coordinate[1]  # Longitude
+            fence_point.z_alt = 100
+            fence_points.waypoints.append(fence_point)
+        return fence_points
 
     def push_hss_coordinates_callback(self, req):
 
@@ -67,10 +82,24 @@ class Air_Defense_Node:
         marker.type = Marker.CYLINDER
         marker.action = Marker.ADD
         marker_array = MarkerArray()
+        wp_push_request = self.draw_empty_fences()
         for data in self.hss_coordinates.hss_Koordinati:
             hssEnlem = data.hssEnlem  # Access fields from each item
             hssBoylam = data.hssBoylam
             hssYaricap = data.hssYaricap
+
+            fence_point = Waypoint()
+            fence_point.frame = 3  # GLOBAL (relative altitude)
+            fence_point.command = 5004  # NAV_FENCE_POINT
+            fence_point.is_current = False  # Not a current waypoint
+            fence_point.autocontinue = True  # Autocontinue
+            fence_point.param1 = hssYaricap  # For circular fences
+            fence_point.x_lat = hssEnlem  # Latitude
+            fence_point.y_long = hssBoylam  # Longitude
+            fence_point.z_alt = 100  # Altitude in meters
+
+            wp_push_request.waypoints.append(fence_point)
+
             # Conversion from geodetic to ENU
             x, y, z = pm.geodetic2enu(
                 hssEnlem, hssBoylam, 0, self.HOME_LATITUDE, self.HOME_LONGITUDE, self.HOME_ALTITUDE)
@@ -108,98 +137,28 @@ class Air_Defense_Node:
 
             # Append the marker to the array
             marker_array.markers.append(marker)
-            self.marker_pub.publish(marker_array)
-            rospy.loginfo("Published HSS markers")
+        self.marker_pub.publish(marker_array)
+        response = self.push_wp(wp_push_request)
+        if response.success:
+            rospy.loginfo("Fence point pushed successfully!")
+            return TriggerResponse(success=1)
+        else:
+            rospy.logwarn("Failed to push fence point.")
+            return TriggerResponse(success=0)
 
-    def enable_geo_fences(self):
-        try:
-            self.write_mission_to_file()
-            self.send_command(CommandCode.DO_FENCE_ENABLE, 1)
-            rospy.loginfo("Geofences enabled!")
-            return TriggerResponse(success=True)
-        except rospy.ServiceException as e:
-            rospy.logerr(f"Service call failed: {e}")
-            return TriggerResponse(success=False)
+    def push_empty_fence_callback(self, _):
+        wp_list = self.draw_empty_fences()
+        rospy.wait_for_service("/mavros/geofence/push")
 
-    def disable_geo_fences(self):
-        try:
-            # Clear the fence-items.txt file
-            with open(self.mission_file_path, 'w') as file:
-                pass  # Open in write mode and close immediately to clear the file
-            self.send_command(CommandCode.DO_FENCE_ENABLE, 0)
-            self.geofence_list = []
-            rospy.loginfo("Geofences disabled!")
-            return TriggerResponse(success=True)
-        except rospy.ServiceException as e:
-            rospy.logerr(f"Service call failed: {e}")
-            return TriggerResponse(success=False)
+        response = self.push_wp(wp_list)
 
-    def create_fence_mission(self):
-        mission_data = "QGC WPL 110\n"
+        if response.success:
+            rospy.loginfo("Fence point pushed successfully!")
+            return TriggerResponse(success=1)
+        else:
+            rospy.logwarn("Failed to push fence point.")
+            return TriggerResponse(success=0)
 
-        # Add each fence as a line in the mission file
-        for i, fence in enumerate(self.geofence_list):
-            line = f"{i}\t0\t0\t5004\t{fence['hssYaricap']}\t0\t0\t0\t{fence['hssEnlem']}\t{fence['hssBoylam']}\t0\t1"
-            mission_data += line + "\n"
-
-        return mission_data
-
-    def write_mission_to_file(self):
-        data = self.create_fence_mission()
-        try:
-            with open(self.mission_file_path, 'w') as file:
-                file.write(data)
-            rospy.loginfo(
-                f"Mission file written successfully to {self.mission_file_path}")
-        except Exception as e:
-            rospy.logerr(f"Failed to write mission file: {e}")
-
-    def send_geofences(self):
-        try:
-            # Enable geofence system
-            self.send_command(CommandCode.DO_FENCE_ENABLE, 1)
-
-            # Send each geofence circle exclusion
-            for i, geofence in enumerate(self.geofence_list):
-                # Sending a circular exclusion zone
-                self.send_command(
-                    CommandCode.NAV_FENCE_CIRCLE_EXCLUSION,
-                    i,
-                    geofence["hssYaricap"],  # Radius
-                    geofence["hssEnlem"],    # Latitude
-                    geofence["hssBoylam"],   # Longitude
-                    0, 0, 0)
-
-            # Complete the geofence definition
-            self.send_command(CommandCode.DO_FENCE_ENABLE, 0)
-        except Exception as e:
-            rospy.logerr(f"Unexpected error occurred: {e}")
-
-    def send_command(self, command, param1, param2=0, param3=0, param4=0, x=0, y=0, z=0):
-        try:
-            rospy.wait_for_service('/mavros/cmd/command_int')
-            response = self.command_int_srv(
-                broadcast=False,
-                frame=3,
-                command=command,
-                current=0,
-                autocontinue=0,  # Convert False to 0 (unsigned integer)
-                param1=int(param1),
-                param2=int(param2),
-                param3=int(param3),
-                param4=int(param4),
-                x=int(x),
-                y=int(y),
-                z=int(z)
-            )
-            if response.success:
-                rospy.loginfo(f"Command {command} sent to plane successfully")
-            else:
-                rospy.logwarn(f"Failed to send command {command}")
-        except rospy.ServiceException as e:
-            rospy.logerr(f"Service call failed: {e}")
-
-    def haversine_formula(self, latitude_1, longitude_1, latitude_2, longitude_2):
         """
         Calculate the great-circle distance between two points on the Earth's surface.
         """

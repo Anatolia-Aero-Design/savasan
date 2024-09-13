@@ -8,7 +8,7 @@ from std_srvs.srv import Trigger
 from server_comm.srv import sendlock, sendlockResponse, sendqr, sendqrResponse, gethss, gethssResponse
 
 
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import TwistStamped, PoseStamped
 from mavros_msgs.msg import State
 import requests
 from server_comm.msg import KonumBilgileri, KonumBilgisi, Kilitlenme, HavaSavunmaKoordinatlari, HavaSavunmaKoordinati
@@ -22,7 +22,7 @@ import threading
 class Comm_Node:
     def __init__(self):
         self.session = requests.Session()
-        self.base_url = "http://127.0.0.1:5000/api"
+        self.base_url = "http://10.0.0.11:10001/api"
         self.username = "estuanatolia"
         self.password = "2Eqtm3v3ZJ"
         self.team_number = 32
@@ -47,27 +47,32 @@ class Comm_Node:
         self.send_qr_message = rospy.Service(
             "send_qr_message", sendqr, self.send_qr_callback)
 
-        self.imu = None
-        self.battery = None
-        self.rel_alt = None
-        self.position = None
-        self.speed = None
-        self.state = None
-        self.fcu_time = None
-        self.fcu_time_nsecs = None
-        self.kilit = None
+        self.get_qr_cord = rospy.Service(
+            "get_qr_cord", Trigger, self.get_qr_cord)
 
-        self.bbox = None
-        self.bbox_x = None
-        self.bbox_y = None
-        self.bbox_w = None
-        self.bbox_h = None
+        self.imu = 0
+        self.battery = 0
+        self.rel_alt = 0
+        self.position = 0
+        self.speed = 0
+        self.state = 0
+        self.fcu_time = 0
+        self.fcu_time_nsecs = 0
+        self.kilit = 0
+
+        self.bbox = 0
+        self.bbox_x = 0
+        self.bbox_y = 0
+        self.bbox_w = 0
+        self.bbox_h = 0
 
         self.start_time = None
         self.end_time = None
 
         try:
             # Initialize Subscribers
+            self.heading_sub = rospy.Subscriber(
+                "/mavros/global_position/compass_hdg", Float64, self.heading_callback)
             self.imu_sub = rospy.Subscriber(
                 "/mavros/imu/data", Imu, self.imu_callback)
             self.battery_sub = rospy.Subscriber(
@@ -80,7 +85,7 @@ class Comm_Node:
                 "/mavros/global_position/global", NavSatFix, self.position_callback
             )
             self.speed_sub = rospy.Subscriber(
-                "/mavros/local_position/velocity_local",
+                "/mavros/global_position/raw/gps_vel",
                 TwistStamped,
                 self.speed_callback,
             )
@@ -97,8 +102,7 @@ class Comm_Node:
                 "/kilit", Bool, self.kilit_callback)
 
         except Exception as e:
-            print("error")
-            rospy.logerr(f"An error occurred in process_data: {str(e)}")
+            rospy.logerr(f"An error occurred during topic callbacks: {str(e)}")
 
         # Initialize Publishers
         self.server_time_pub = rospy.Publisher(
@@ -122,6 +126,12 @@ class Comm_Node:
         while not rospy.is_shutdown():
             self.sent_telem()
             rate.sleep()
+
+    def get_qr_cord(self, _):
+        url = f'{self.base_url}/qr_koordinati'
+        response = self.session.get(url)
+        rospy.set_param('Target_Lat', response.json().get('qrEnlem'))
+        rospy.set_param('Target_Lon', response.json().get('qrBoylam'))
 
     def get_hss_coordinates(self, _):
         try:
@@ -221,6 +231,9 @@ class Comm_Node:
             return sendqrResponse(success=1, result=response.status_code)
         return sendqrResponse(success=0, result=response.status_code)
 
+    def heading_callback(self, msg):
+        self.heading = float(msg.data)
+
     def imu_callback(self, msg):
         self.imu = msg
 
@@ -274,7 +287,6 @@ class Comm_Node:
         return response
 
     def sent_telem(self):
-
         if not (
             self.imu
             and self.battery
@@ -283,7 +295,7 @@ class Comm_Node:
             and self.speed
             and self.state
         ):
-            pass
+            rospy.logwarn('Telemetry passed')
         try:
 
             if self.state.mode == "MANUAL" or self.state.mode == "FBWA":
@@ -295,7 +307,7 @@ class Comm_Node:
             rospy.logerr(f"mode secerken hata{self.state}")
             IHA_otonom = 0
         try:
-            if self.imu is not None and hasattr(self.imu, 'orientation'):
+            if self.imu is not None:
                 roll, pitch, yaw = quaternion_to_euler(
                     self.imu.orientation.x,
                     self.imu.orientation.y,
@@ -304,26 +316,24 @@ class Comm_Node:
                 )
             else:
                 rospy.logwarn("IMU data is not available or incomplete.")
-                return  # or set default values for roll, pitch, yaw
         except Exception as e:
             rospy.logerr(f"Error processing IMU data: {e}")
-
+        try:
             # Prepare data dictionary
             data_dict = {
                 "takim_numarasi": self.team_number,
                 "iha_enlem": self.position.latitude,
                 "iha_boylam": self.position.longitude,
                 "iha_irtifa": self.rel_alt.data,
-                "iha_dikilme": pitch,
-                "iha_yonelme": yaw,
-                "iha_yatis": roll,
-                "iha_hizi": calculate_speed(
+                "iha_dikilme": -roll,
+                "iha_yonelme": self.heading,
+                "iha_yatis": pitch,
+                "iha_hiz": calculate_speed(
                     self.speed.twist.linear.x,
                     self.speed.twist.linear.y,
                 ),
                 "iha_batarya": int(self.battery.percentage * 100),
                 "iha_otonom": IHA_otonom,
-                "iha_kilitlenme": int(self.kilit),
                 "iha_kilitlenme": int(self.kilit),
                 "hedef_merkez_X": self.bbox_x,
                 "hedef_merkez_Y": self.bbox_y,
@@ -332,19 +342,17 @@ class Comm_Node:
                 "gps_saati": unix_to_utc_formatted(self.fcu_time, self.fcu_time_nsecs)
             }
 
-            # Send data to the server
             response = self.session.post(
                 self.server_url_telemetri_gonder, json=data_dict
             )
-
             # Check server response
             if response.status_code == 200:
                 self.parse_and_publish_konumBilgileri(response.json())
+
             else:
                 rospy.logerr(
                     f"Failed to send data, status code: {response}"
                 )
-
         except Exception as e:
             rospy.logerr(f"An error occurred in process_data: {e}")
 
@@ -356,14 +364,14 @@ class Comm_Node:
 
             for item in konumBilgileri_data:
                 konum_bilgisi = KonumBilgisi()
-                konum_bilgisi.IHA_boylam = item["IHA_boylam"]
-                konum_bilgisi.IHA_dikilme = item["IHA_dikilme"]
-                konum_bilgisi.IHA_enlem = item["IHA_enlem"]
-                konum_bilgisi.IHA_hiz = item["IHA_hiz"]
-                konum_bilgisi.IHA_irtifa = item["IHA_irtifa"]
-                konum_bilgisi.IHA_yatis = item["IHA_yatis"]
-                konum_bilgisi.IHA_yonelme = item["IHA_yonelme"]
-                konum_bilgisi.IHA_zamanfarki = item["IHA_zamanfarki"]
+                konum_bilgisi.IHA_boylam = item["iha_boylam"]
+                konum_bilgisi.IHA_dikilme = item["iha_dikilme"]
+                konum_bilgisi.IHA_enlem = item["iha_enlem"]
+                konum_bilgisi.IHA_hiz = item["iha_hizi"]
+                konum_bilgisi.IHA_irtifa = item["iha_irtifa"]
+                konum_bilgisi.IHA_yatis = item["iha_yatis"]
+                konum_bilgisi.IHA_yonelme = item["iha_yonelme"]
+                konum_bilgisi.IHA_zamanfarki = item["zaman_farki"]
                 konum_bilgisi.takim_numarasi = item["takim_numarasi"]
 
                 konumBilgileri_msg.konumBilgileri.append(konum_bilgisi)

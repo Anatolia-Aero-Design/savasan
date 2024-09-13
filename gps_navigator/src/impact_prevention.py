@@ -45,15 +45,20 @@ class Impact_Prevention:
                 return distance
 
     def main(self):
-        while self.target_id is not None:    
-            distance = self.distance_calculator()
-            if distance is not None and distance <= 30:
-                rospy.wait_for_service('stop_navigation')
-                stop_service = rospy.ServiceProxy("stop_navigation", Trigger)
-                response = stop_service()
-                if response == 1:
-                    rospy.logwarn(
-                        f"GPS navigation stopped due to distance: {distance} meters")
+        rate = rospy.Rate(10)  # 10 Hz loop rate
+        while not rospy.is_shutdown():
+            while self.target_id is not None:
+                distance = self.distance_calculator()
+                if distance is not None and distance <= 30:
+                    rospy.wait_for_service('stop_navigation')
+                    stop_service = rospy.ServiceProxy(
+                        "stop_navigation", Trigger)
+                    response = stop_service()
+                    if response == 1:
+                        rospy.logwarn(
+                            f"GPS navigation stopped due to distance: {distance} meters")
+            rate.sleep()  # Sleep to maintain the loop rate
+
 
 if __name__ == '__main__':
     try:

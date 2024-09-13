@@ -69,21 +69,6 @@ class Lock_Checker:
         self.kilit_pub = rospy.Publisher("/kilit", Bool, queue_size=60)
         self.param_name = "elapsed_time"
 
-
-        self.screen_width = 1280
-        self.screen_height = 720
-        # Draw target area
-        target_box_x = int(self.screen_width * 0.25)
-        target_box_y = int(self.screen_height * 0.1)
-        target_box_w = int(self.screen_width * 0.75)
-        target_box_h = int(self.screen_height * 0.9)
-        self.target_box_coordinates = (
-            target_box_x,
-            target_box_y,
-            target_box_w,
-            target_box_h,
-        )
-
         self.timer = Timer()
         self.elapsed_time = None
         self.timer_check = False
@@ -167,7 +152,7 @@ class Lock_Checker:
             return intersect_horizontal_proportion, intersect_vertical_proportion
 
     def lock_on_status(self, proportions, lock_on_status, kilit):
-        if proportions[0] >= 0.06 and proportions[1] >= 0.06:
+        if proportions[0] == 1.0 and proportions[1] == 1.0:
             start_time = self.timer.start()
             self.elapsed_time = self.timer.elapsed()
             elapsed_time_str = self.timer.format_time(self.elapsed_time) if self.elapsed_time else "00:00.00"
