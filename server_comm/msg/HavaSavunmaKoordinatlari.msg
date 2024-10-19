@@ -1,1 +1,0 @@
-HavaSavunmaKoordinati[] hss_Koordinati
